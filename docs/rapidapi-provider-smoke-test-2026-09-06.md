@@ -1,6 +1,36 @@
 # RapidAPI provider smoke test — 2026-09-06
 
-## Harness retry after the subscription update
+## Completed Harness-configured CLI execution
+
+The repaired command now loads Harness's capability authority, provider descriptors,
+surface route and runtime connection, then executes the selected shared HTTP provider:
+
+```powershell
+sfx provider evaluate rapidapi/yahoo-finance166 --estate C:\lab\repos\agentic-harness --json
+```
+
+The final verified invocation returned **HTTP 200**, native **`status: OK`**, and
+**`PASSED`**. The response contained 40,431 bytes. All three declared field checks
+passed: native status equals `OK`, `data` is an object and `data.main` is an object.
+There was one request, no retry and no redirect. CLI exit status was 0.
+
+Execution **`exec-58b921be-8875-4963-af07-545edde5975a`** was read back and verified
+with `sfx execution observe`. Its [evidence summary](evidence/provider-cli-harness-finance166-2026-09-06.json)
+retains exact authority and connection paths beneath `agentic-harness`, their
+digests, the request URL, checks, timing, body digest and receipt digest.
+
+Harness owns the active `evaluate-http-provider` authority and all provider data.
+The installed CLI distributes the shared HTTP provider mechanics through package
+exports. The provider receives and validates the Harness authority file itself;
+the bundled example is not its source of meaning. The old CLI-local project
+configuration is now an opt-in example. Selecting an estate cannot silently use
+another working directory's provider configuration.
+
+This proves `ESTATE_CONFIGURED_CAPABILITY` execution. It does not relabel the
+older open-slot provisioned tokens as admitted capsules. The earlier blocked
+retry and separate local observations below remain historical evidence.
+
+## Earlier blocked Harness retry after the subscription update
 
 The user clarified that the selected provider and consuming capability must come
 from `agentic-harness`. The earlier successful HTTP observations below used the

@@ -1,19 +1,23 @@
 # Bounded HTTP provider
 
-This independent package owns `evaluate-http-provider`: request admission,
+This independent package supplies the mechanics for `evaluate-http-provider`: request validation,
 credential reference resolution, one HTTP exchange, JSON parsing, declared field
 checks and redaction. The CLI invokes it through `sfx-process-runtime.v1` over
 stdin/stdout. It imports no CLI or Agentic Harness implementation.
 
-`capability.json` owns the capability's meaning, input/event/outcome identities,
-contract vocabulary and required provider profile. `runtime.json` binds the
-physical process and exact implementation/configuration bytes. The selected Node
+Harness's `authority/capabilities/evaluate-http-provider/capability.authority.json`
+owns the active capability's meaning, input/event/outcome identities, contract
+vocabulary and required provider profile. Its runtime connection passes that exact
+file as the worker's second argument, after the operation-descriptor file. The
+worker validates the authority digest before executing. The bundled `capability.json`
+and `runtime.json` remain examples for explicitly configured standalone use.
+The selected Node
 implementation uses built-in HTTP, JSON and operating-system mechanics. Python,
 .NET, JVM, Go and services remain eligible implementations of the same contract;
 none is automatically qualified by being listed.
 
-This is a locally installed capability. It has no `.sfxcap`, no Harness admission,
-and no managed publication claim. Local digests detect changes; they are not
+The configured capability has no `.sfxcap` and makes no capsule admission
+or managed publication claim. Local digests detect changes; they are not
 signatures or enterprise admission. `sfx capsule` never represents it as a capsule.
 
 ## Evaluation contract
@@ -50,6 +54,12 @@ representations from returned strings and applies secret-field hygiene. Arbitrar
 third-party sensitive content is outside that redaction claim.
 
 ## Changing the local binding
+
+Harness connections use `module:sidefx-cli/providers/http` and its transport and
+credential exports to locate the installed provider without depending on a source
+checkout. Every selected artifact is digest-bound. Artifact arguments refer only
+to those pinned entries. The operation and capability files are owned by Harness;
+the CLI contains no provider-specific routing branches.
 
 After reviewing changes to declared artifacts or configuration, update their local
 digests from the repository root:

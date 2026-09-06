@@ -2,8 +2,11 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { requireValue, SidefxError } from './errors.mjs';
 
-export async function loadConfiguration(configPath, cwd = process.cwd()) {
-  const file = path.resolve(cwd, configPath ?? 'sfx.config.json');
+export async function loadConfiguration(configPath, cwd = process.cwd(), { estateRoot } = {}) {
+  // An explicit estate selects its own configuration, including when it has none.
+  // Never let the caller's working directory silently substitute another provider.
+  const file = configPath ? path.resolve(cwd, configPath)
+    : path.resolve(cwd, estateRoot || '.', 'sfx.config.json');
   let document;
   try { document = JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, '')); }
   catch (error) {
@@ -11,13 +14,15 @@ export async function loadConfiguration(configPath, cwd = process.cwd()) {
     throw new SidefxError('CONFIGURATION_REJECTED', `Cannot load configuration: ${file}`, 2);
   }
   requireValue(document?.configurationType === 'sfx-project.v1'
-    && Object.keys(document).every(key => ['configurationType', 'catalogs', 'routes', 'runtimes'].includes(key))
+    && Object.keys(document).every(key => ['configurationType', 'estate', 'catalogs', 'routes', 'runtimes'].includes(key))
+    && (document.estate === undefined || (typeof document.estate === 'string' && document.estate.length > 0))
     && (document.catalogs === undefined || (Array.isArray(document.catalogs) && document.catalogs.every(item => typeof item === 'string')))
     && (document.runtimes === undefined || (Array.isArray(document.runtimes) && document.runtimes.every(item => typeof item === 'string')))
     && (document.routes === undefined || typeof document.routes === 'string'),
   'CONFIGURATION_REJECTED', 'Expected sfx-project.v1 with catalog, route and runtime file references.', 2);
   const resolve = value => path.resolve(path.dirname(file), value);
-  return { catalogPaths: (document.catalogs ?? []).map(resolve),
+  return { ...(document.estate === undefined ? {} : { estateRoot: resolve(document.estate) }),
+    catalogPaths: (document.catalogs ?? []).map(resolve),
     runtimePaths: (document.runtimes ?? []).map(resolve),
     defaultRoutesPath: document.routes === undefined ? undefined : resolve(document.routes) };
 }

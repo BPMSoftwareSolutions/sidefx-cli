@@ -119,7 +119,15 @@ provider/capability authority and input. The local HTTP provider now supplies
 bounded evaluation for four configured RapidAPI operations, verified through
 `sfx provider evaluate`. It makes no complete-schema, freshness, interchangeability,
 admission or publication claim. The Harness's separate RapidAPI tokens retain
-their open event-mechanic slots; this local provider does not close those slots.
+their open event-mechanic slots; this configured provider does not close those slots.
+
+Harness now owns the executable evaluation configuration: capability authority,
+operation descriptors, catalog, surface route and process connection. The selected
+estate's configuration takes precedence over the invoking project's defaults.
+The HTTP provider receives both the Harness operation file and its exact capability
+authority file. Installed package exports locate generic mechanics, with artifact
+digests checked before invocation. No absolute source-checkout path is required by
+the Harness connection. Scope and source paths are retained in the execution receipt.
 
 The content-creation workspace informed the evidence and teaching model. It is
 not a runtime dependency. No frozen corpus or example provider is imported as

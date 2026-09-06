@@ -1,5 +1,23 @@
 # Verification — September 6, 2026
 
+## Harness-owned configuration and installed provider execution
+
+All 48 CLI/SDK/process tests pass. Added coverage proves estate selection from
+another working directory, environment selection, explicit configuration precedence,
+no implicit project fallback, installed package artifact resolution, changed and
+unpinned artifact rejection, and execution using estate authority whose bytes differ
+from the provider's bundled example. Receipts retain the authority and connection
+locations. The 219-capability estate integration also passed, including native
+invocation parity and focused fixture proof.
+
+The live Finance166 news invocation through `sfx --estate` returned HTTP 200,
+`status: OK`, and `PASSED`, with all three declared response-field checks passing.
+Its [verified evidence](evidence/provider-cli-harness-finance166-2026-09-06.json)
+records the command, exact Harness authority and provider connection, response
+digest, HTTP facts and receipt digest. No credential value is stored in repository
+configuration or this evidence. This verifies configured capability execution;
+the existing provisioned tokens were not promoted to admitted capsules.
+
 ## Local provider execution repair
 
 The repair passed 45 CLI/SDK/process tests on Windows. Eight new tests exercise

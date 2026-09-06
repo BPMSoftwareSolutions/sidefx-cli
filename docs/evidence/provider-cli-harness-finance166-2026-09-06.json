@@ -1,0 +1,98 @@
+{
+  "observationType": "sfx-harness-configured-provider-evaluation.v1",
+  "observedAt": "2026-09-06T22:12:01.5592406Z",
+  "command": "sfx provider evaluate rapidapi/yahoo-finance166 --estate C:\\lab\\repos\\agentic-harness --json",
+  "workingDirectory": "C:\\lab\\repos\\sidefx-cli",
+  "exitCode": 0,
+  "executionId": "exec-58b921be-8875-4963-af07-545edde5975a",
+  "receiptDigest": "sha256:4452f200c812773237f2eed0cb79e7e56cbc4e898a12a2db693f926432f865d3",
+  "capability": {
+    "capabilityId": "evaluate-http-provider",
+    "capabilityVersion": "0.1.0",
+    "capsuleDigest": null,
+    "capabilityAuthorityDigest": "sha256:9d3ce7d04c87cb5b662aacff8bd6fd06290d2c69fd8e8ec246a344ad1fb263e2",
+    "userStory": {
+      "actor": "provider consumer",
+      "intent": "Test a selected provider operation through its declared request and response checks",
+      "outcome": "One bounded exchange yields attributable response or rejection evidence"
+    },
+    "experience": {
+      "promise": "Validate inputs and resolve a credential reference, perform one bounded HTTP exchange, preserve rejection testimony, and check declared response fields without implying admission or provider equivalence"
+    },
+    "rootScenarioId": "evaluate-declared-http-operation",
+    "providers": [
+      {
+        "bindingId": "evaluate-http-provider",
+        "providerCapabilityId": "sidefx/bounded-http",
+        "providerProfileId": "bounded-http-operation.v1",
+        "runtimeFamily": "node"
+      }
+    ],
+    "runtimeManifestDigest": "sha256:e837715128c79f622844f49c523ba0b7f8fa23b1ab1f11c43523b1764d04ddf0",
+    "authorityPath": "C:\\lab\\repos\\agentic-harness\\authority\\capabilities\\evaluate-http-provider\\capability.authority.json",
+    "runtimeManifestPath": "C:\\lab\\repos\\agentic-harness\\authority\\provider-connections\\bounded-http.runtime.json",
+    "authorityScope": "ESTATE_CONFIGURED_CAPABILITY",
+    "managedAdmission": "NOT_CLAIMED"
+  },
+  "resultDigest": "sha256:983f7d26330c603ccac50ed8f20b30f4288b8a3b03dbea19951c69be7f5c0535",
+  "disposition": "PASSED",
+  "providerId": "rapidapi/yahoo-finance166",
+  "operationId": "news-list",
+  "request": {
+    "method": "GET",
+    "url": "https://yahoo-finance166.p.rapidapi.com/api/news/list?snippetCount=500&region=US",
+    "credentialReference": {
+      "kind": "environment",
+      "name": "RAPID_API_KEY",
+      "scope": "user"
+    }
+  },
+  "configurationDigest": "sha256:4c389fc8d2736a0963f9c0cfd05d29380a9d853ab48866b7e3a6d5830d60eea1",
+  "descriptorDigest": "sha256:ee70479db433e052e7d39357c6090ca3b73cd143a55548f3a73c29f0f2916832",
+  "observation": {
+    "transportDisposition": "HTTP_RESPONSE_OBSERVED",
+    "httpStatus": 200,
+    "contentType": "application/json; charset=utf-8",
+    "bodyBytes": 40431,
+    "responseBodyDigest": "sha256:4c2e42c8b80673afd618c88f0bbf52cd0924a224e3691374dd3c6555c44a8ea2",
+    "startedAt": "2026-09-06T22:11:59.995Z",
+    "completedAt": "2026-09-06T22:12:01.361Z",
+    "durationMilliseconds": 1365,
+    "attemptCount": 1,
+    "retryCount": 0,
+    "redirectsFollowed": 0,
+    "maximumResponseBytes": 1048576,
+    "timeoutMilliseconds": 12000
+  },
+  "validation": {
+    "expectedStatus": [
+      200
+    ],
+    "statusPassed": true,
+    "jsonValid": true,
+    "checks": [
+      {
+        "pointer": "/status",
+        "expectedType": "string",
+        "passed": true
+      },
+      {
+        "pointer": "/data",
+        "expectedType": "object",
+        "passed": true
+      },
+      {
+        "pointer": "/data/main",
+        "expectedType": "object",
+        "passed": true
+      }
+    ],
+    "responseCoverage": "DECLARED_FIELDS_ONLY"
+  },
+  "nativeStatus": "OK",
+  "responseRootKeys": [
+    "data",
+    "status"
+  ],
+  "receiptVerifiedThroughSfx": true
+}

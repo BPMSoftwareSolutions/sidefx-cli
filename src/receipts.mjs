@@ -51,6 +51,7 @@ export class ReceiptStore {
         userStory: capability.userStory, experience: capability.experience,
         rootScenarioId: capability.rootScenarioId, providers: capability.providers,
         ...(capability.runtimeManifestDigest ? { runtimeManifestDigest: capability.runtimeManifestDigest,
+          authorityPath: capability.authorityPath, runtimeManifestPath: capability.runtimeManifestPath,
           authorityScope: capability.authorityScope, managedAdmission: capability.managedAdmission } : {}),
       },
       inputDigest: input === undefined ? null : digest(input),

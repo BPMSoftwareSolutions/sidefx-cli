@@ -66,42 +66,47 @@ npm install --global .
 
 ## Test the configured providers
 
-From `C:\lab\repos\sidefx-cli`, with `sfx` installed:
+Select the Harness estate from any working directory:
 
 ```powershell
-sfx provider evaluate rapidapi/realty-us --json
-sfx provider evaluate rapidapi/yahoo-finance15 --json
-sfx provider evaluate rapidapi/yahoo-finance166 --json
-sfx provider evaluate rapidapi/yahoo-finance-real-time1 --json
+sfx provider evaluate rapidapi/yahoo-finance166 --estate C:\lab\repos\agentic-harness --json
 ```
 
-The project configuration selects a separate [HTTP provider package](packages/http-provider/README.md).
-Provider instances are [configuration data](config/http-providers.json), not CLI
-branches. It uses the existing Windows user environment variable `RAPID_API_KEY`;
+Harness owns `sfx.config.json`, the `evaluate-http-provider` capability authority,
+the provider catalog, operation descriptors and runtime connection under `authority/`.
+The connection selects a separate [HTTP provider package](packages/http-provider/README.md)
+delivered with the installed CLI. Package exports locate the mechanics; the Harness
+connection pins their bytes and supplies the exact Harness authority and operation files.
+It uses the existing Windows user environment variable `RAPID_API_KEY`;
 the credential is resolved inside the provider. On another OS, configure an
 available credential reference and rebind the local runtime as documented by the package.
 
-The September 6 [CLI test](docs/rapidapi-provider-smoke-test-2026-09-06.md) of the
-user-selected operations returned HTTP 200 with valid JSON for Realty US listings,
-Yahoo Finance15 news and Yahoo Finance166 news. Yahoo Finance Real Time options
-returned HTTP 403 with a missing-subscription message. Each invocation performed
-one request and retained an execution receipt. The configured defaults reproduce
-the supplied fulfillment ID, tickers, snippet count, symbol, language and region.
+The September 6 [Harness CLI test](docs/rapidapi-provider-smoke-test-2026-09-06.md)
+returned HTTP 200, native `status: OK`, and `PASSED` for Finance166 news. It checked
+the native status and the `data` and `data.main` object fields. The execution receipt
+retains the Harness authority path, runtime connection path and their exact digests.
+The other three supplied provider operations are also declared in Harness;
+their earlier HTTP observations are identified separately in the report.
 
-This is local provider execution, not Harness admission. `PASSED` covers the
-selected operation's declared checks; it does not establish data freshness or
-provider interchangeability. These four operation defaults check HTTP status and
-JSON syntax; they do not declare complete response schemas. CLI exit 0 means delivery completed: inspect
-`result.disposition` for the evaluation result.
+This is execution of a Harness-configured capability through its selected process
+provider. It does not promote the older provisioned tokens or claim capsule admission.
+`PASSED` covers the declared response checks. CLI exit 0 means delivery completed:
+inspect `result.disposition` for the evaluation result.
 
-From another directory, supply the project configuration explicitly:
+Alternatively, select the estate once per shell:
 
 ```powershell
-sfx provider evaluate rapidapi/yahoo-finance166 --config C:\lab\repos\sidefx-cli\sfx.config.json --json
+$env:SIDEFX_ESTATE = 'C:\lab\repos\agentic-harness'
+sfx provider evaluate rapidapi/yahoo-finance166 --json
 ```
 
-`sfx.config.json` is loaded from the current directory. Its paths resolve relative
-to that file. Explicit `--catalog` and `--routes` override their project defaults.
+`--estate` or `SIDEFX_ESTATE` selects that estate's `sfx.config.json`. Without an
+estate selection, the current directory's configuration is used; Harness's file
+declares `estate: "."`. Explicit `--config` takes precedence. A selected estate
+with no configuration never falls back to a different project's provider.
+Paths resolve relative to the selected file. Explicit `--catalog` and `--routes`
+override their project defaults. The former CLI-local binding is now an opt-in
+[example](examples/local-http.config.json), rather than the default configuration.
 Default routes apply only to matching object/operation/identity keys. Missing
 bindings keep their explicit error; no provider is selected by name heuristics.
 

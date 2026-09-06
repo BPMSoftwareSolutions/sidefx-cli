@@ -128,9 +128,11 @@ try {
   let size = 0;
   for await (const chunk of process.stdin) { size += chunk.length; fail(size <= 8 * 1024 * 1024, 'INPUT_LIMIT_EXCEEDED'); chunks.push(chunk); }
   const request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  const authorityBytes = await readFile(new URL('./capability.json', import.meta.url));
+  const authorityBytes = await readFile(process.argv[3] ?? new URL('./capability.json', import.meta.url));
   const authority = JSON.parse(authorityBytes);
   capabilityId = authority.capabilityId;
+  fail(authority.inputContractId === 'sfx-semantic-command.v1'
+    && authority.requiredProviderProfile?.profileId === 'bounded-http-operation.v1', 'PROVIDER_PROFILE_REJECTED');
   fail(request.protocol === 'sfx-runtime-request.v1' && request.capabilityId === capabilityId
     && request.capabilityAuthorityDigest === sha(authorityBytes), 'AUTHORITY_IDENTITY_REJECTED');
   const configBytes = await readFile(process.argv[2]);

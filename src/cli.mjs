@@ -55,7 +55,7 @@ Compatibility: existing verb-first forms remain, including sfx invoke, inspect,
   find, search, reveal, evaluate, observe, explain, compare, list and verify.
 
 Options:
-  --config FILE       Project configuration (default: ./sfx.config.json if present)
+  --config FILE       Configuration (default: selected estate, otherwise current directory)
   --estate PATH       Estate with its installed sda-bootstrap (or SIDEFX_ESTATE)
   --state PATH        Local receipts and provider references (or SIDEFX_HOME)
   --catalog FILE      Provider discovery catalog; repeat for multiple files
@@ -168,8 +168,9 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     if (parsed.help) { stdout.write(json ? `${JSON.stringify({ command: 'sfx', help })}\n` : help); return 0; }
     const { values, request } = parsed;
     request.input = await readInput(values.input, stdin);
-    const configuration = await loadConfiguration(values.config);
-    const sidefx = factory({ ...configuration, estateRoot: values.estate, stateRoot: values.state,
+    const selectedEstate = values.estate ?? process.env.SIDEFX_ESTATE;
+    const configuration = await loadConfiguration(values.config, process.cwd(), { estateRoot: selectedEstate });
+    const sidefx = factory({ ...configuration, estateRoot: selectedEstate || configuration.estateRoot, stateRoot: values.state,
       catalogPaths: values.catalog ?? configuration.catalogPaths, routesPath: values.routes,
       timeoutMs: values.timeout === undefined ? undefined : Number(values.timeout) });
     const result = await sidefx.execute(request);

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { bytesDigest } from './data.mjs';
 import { requireValue, SidefxError } from './errors.mjs';
 import { isCapabilityId } from './catalog.mjs';
+import { resolveRuntimeArtifact } from './runtime-artifacts.mjs';
 
 const sha = value => typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test(value);
 
@@ -24,7 +25,8 @@ export class ConfiguredRuntime {
       const manifest = JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, ''));
       requireValue(manifest?.runtimeType === 'sfx-process-runtime.v1'
         && typeof manifest.executable === 'string' && manifest.executable.length > 0
-        && Array.isArray(manifest.args) && manifest.args.every(arg => typeof arg === 'string')
+        && Array.isArray(manifest.args) && manifest.args.every(arg => typeof arg === 'string'
+          || (arg && typeof arg.artifact === 'string' && Object.keys(arg).length === 1))
         && typeof manifest.providerId === 'string' && typeof manifest.profileId === 'string'
         && typeof manifest.runtimeFamily === 'string'
         && manifest.artifacts && Object.keys(manifest.artifacts).length > 0
@@ -32,13 +34,22 @@ export class ConfiguredRuntime {
       'RUNTIME_PROFILE_REJECTED', 'Invalid process runtime profile.', 2);
       const root = path.dirname(path.resolve(file));
       const artifacts = new Map();
+      const artifactPaths = new Map();
       for (const [reference, expected] of Object.entries(manifest.artifacts)) {
         requireValue(sha(expected), 'RUNTIME_PROFILE_REJECTED', 'Every runtime artifact needs an exact digest.', 2);
-        const artifact = await readFile(path.resolve(root, reference));
+        const artifactPath = resolveRuntimeArtifact(reference, path.resolve(file));
+        const artifact = await readFile(artifactPath);
         requireValue(bytesDigest(artifact) === expected, 'RUNTIME_ARTIFACT_CHANGED',
           `Runtime artifact changed: ${reference}. Review and rebind the provider.`, 4);
         artifacts.set(reference, artifact);
+        artifactPaths.set(reference, artifactPath);
       }
+      const args = manifest.args.map(arg => {
+        if (typeof arg === 'string') return arg;
+        requireValue(artifactPaths.has(arg.artifact), 'RUNTIME_BINDING_REJECTED',
+          'An artifact argument must reference a digest-bound artifact.', 2);
+        return artifactPaths.get(arg.artifact);
+      });
       for (const [capabilityId, reference] of Object.entries(manifest.capabilities)) {
         requireValue(isCapabilityId(capabilityId) && artifacts.has(reference) && !bindings.has(capabilityId),
           'RUNTIME_BINDING_REJECTED', 'Runtime capability bindings must be unique and digest-bound.', 2);
@@ -47,15 +58,20 @@ export class ConfiguredRuntime {
           && authority.capabilityId === capabilityId && typeof authority.capabilityVersion === 'string'
           && Array.isArray(authority.scenarios) && authority.scenarios.length > 0 && authority.contracts,
         'CAPABILITY_REPRESENTATION_REJECTED', 'Invalid capability representation from the configured provider.', 4);
+        const authorityPath = artifactPaths.get(reference);
+        const relative = this.estate.estateRoot && path.relative(this.estate.estateRoot, authorityPath);
+        const estateOwned = Boolean(this.estate.estateRoot) && relative !== undefined && relative !== null
+          && !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`);
         const capability = { ...authority, capsuleDigest: null,
           capabilityAuthorityDigest: manifest.artifacts[reference],
           authority: { entryRef: reference, entryDigest: manifest.artifacts[reference], value: authority },
-          authorityScope: 'LOCAL_INSTALLED_CAPABILITY', managedAdmission: 'NOT_CLAIMED',
+          authorityScope: estateOwned ? 'ESTATE_CONFIGURED_CAPABILITY' : 'LOCAL_INSTALLED_CAPABILITY',
+          authorityPath, runtimeManifestPath: path.resolve(file), managedAdmission: 'NOT_CLAIMED',
           runtimeManifestDigest: bytesDigest(bytes), target: manifest.runtimeFamily,
           providers: [{ bindingId: capabilityId, providerCapabilityId: manifest.providerId,
             providerProfileId: manifest.profileId, runtimeFamily: manifest.runtimeFamily }],
           plan: { type: manifest.runtimeType, entryRef: file, entryDigest: bytesDigest(bytes) } };
-        bindings.set(capabilityId, { root, manifest, capability });
+        bindings.set(capabilityId, { root, manifest: { ...manifest, args }, capability });
       }
     }
     return bindings;

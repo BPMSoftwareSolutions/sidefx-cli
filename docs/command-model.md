@@ -203,6 +203,22 @@ runtime manifests. Paths resolve relative to the configuration file, including w
 only. Explicit CLI routes and catalogs override project defaults. SDK callers use
 `loadConfiguration()` and pass its result to `createSidefx()` for the same bindings.
 
+An explicit `--config` wins; otherwise `--estate` or `SIDEFX_ESTATE` selects the
+estate's configuration. Only when neither is supplied does the CLI load the current
+directory's configuration. An estate without configuration does not inherit the
+current project's routes or runtimes. Optional `estate` in a configuration is a
+path relative to that file. SDK callers can pass `{ estateRoot }` as the third
+argument to `loadConfiguration()` for the same selection behavior.
+
+Process manifests may identify artifacts by `module:<package-export>`. Resolution
+checks the selected connection's installed packages, then the CLI's installed
+packages. The expected digest remains mandatory. An argument `{ "artifact": REF }`
+resolves only an artifact already pinned in that manifest. This lets an estate own
+its declarative capability and operation files while selecting installed provider
+mechanics independently. Receipts retain `authorityPath`, `runtimeManifestPath`
+and both content digests. `ESTATE_CONFIGURED_CAPABILITY` identifies an authority
+file beneath the selected estate; it does not mean an admitted capsule.
+
 ## Compatibility and implementation ownership
 
 Existing verb-first forms remain supported, including `sfx invoke`, `sfx inspect`,

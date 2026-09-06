@@ -214,3 +214,73 @@ test('SDK snapshots the semantic command before looking up default routes', asyn
   assert.equal(result.result.providerId, 'custom/service');
   assert.equal(result.result.response.item, 'original');
 });
+
+test('selected estate configuration owns execution from any cwd and retains authority locations', async t => {
+  const f = await fixture(t, (req, res) => res.end('{"item":"one"}'));
+  const caller = await temporary(t);
+  // This must not be loaded when an estate was explicitly selected.
+  await writeFile(path.join(caller, 'sfx.config.json'), 'invalid unrelated project configuration');
+  for (const selection of ['flag', 'environment']) {
+    const result = await cli(caller, ['provider', 'evaluate', 'custom/service',
+      ...(selection === 'flag' ? ['--estate', f.root] : [])],
+    selection === 'environment' ? { SIDEFX_ESTATE: f.root } : {});
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.value.result.disposition, 'PASSED');
+    const observed = await cli(caller, ['execution', 'observe', result.value.executionId, '--estate', f.root]);
+    assert.equal(observed.value.capability.authorityScope, 'ESTATE_CONFIGURED_CAPABILITY');
+    assert.equal(observed.value.capability.authorityPath, path.join(f.providerRoot, 'capability.json'));
+    assert.equal(observed.value.capability.runtimeManifestPath, f.profile);
+    assert.equal(observed.value.capability.capsuleDigest, null);
+  }
+  assert.equal(f.requests.length, 2);
+});
+
+test('an estate with no configuration cannot silently execute the current directory provider', async t => {
+  const f = await fixture(t, (req, res) => res.end('{"item":"one"}'));
+  const emptyEstate = await temporary(t);
+  const result = await cli(f.root, ['provider', 'evaluate', 'custom/service', '--estate', emptyEstate]);
+  assert.equal(result.error.code, 'CAPABILITY_ROUTE_REQUIRED');
+  assert.equal(f.requests.length, 0);
+  const explicit = await cli(f.root, ['provider', 'evaluate', 'custom/service', '--estate', emptyEstate,
+    '--config', path.join(f.root, 'sfx.config.json')]);
+  assert.equal(explicit.code, 0, explicit.stderr);
+  assert.equal(f.requests.length, 1);
+});
+
+test('estate declarative bindings resolve installed package mechanics and reject unpinned or changed artifacts', async t => {
+  const f = await fixture(t, (req, res) => res.end('{"item":"one"}'));
+  const files = { 'module:sidefx-cli/providers/http': 'worker.mjs',
+    'module:sidefx-cli/providers/http/transport': 'http.mjs',
+    'module:sidefx-cli/providers/http/credentials': 'credentials.mjs' };
+  for (const [reference, name] of Object.entries(files)) {
+    f.manifest.artifacts[reference] = bytesDigest(await readFile(path.join(packageRoot, name)));
+    delete f.manifest.artifacts[name];
+  }
+  // Authority belongs to this estate, independently of the provider's bundled example.
+  const authority = JSON.parse(await readFile(path.join(f.providerRoot, 'capability.json'), 'utf8'));
+  authority.name = 'Harness-owned operation evaluation';
+  await writeFile(path.join(f.providerRoot, 'capability.json'), JSON.stringify(authority));
+  f.manifest.artifacts['capability.json'] = bytesDigest(await readFile(path.join(f.providerRoot, 'capability.json')));
+  f.routes.routes[0].authorityDigest = f.manifest.artifacts['capability.json'];
+  await writeFile(path.join(f.root, 'routes.json'), JSON.stringify(f.routes));
+  f.manifest.args = [{ artifact: 'module:sidefx-cli/providers/http' }, { artifact: 'config.json' }, { artifact: 'capability.json' }];
+  await writeFile(f.profile, JSON.stringify(f.manifest));
+  const project = JSON.parse(await readFile(path.join(f.root, 'sfx.config.json'), 'utf8'));
+  project.estate = '.';
+  await writeFile(path.join(f.root, 'sfx.config.json'), JSON.stringify(project));
+  const result = await cli(f.root, ['provider', 'evaluate', 'custom/service']);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.value.result.disposition, 'PASSED');
+  const observed = await cli(f.root, ['execution', 'observe', result.value.executionId]);
+  assert.equal(observed.value.capability.authorityScope, 'ESTATE_CONFIGURED_CAPABILITY');
+  f.manifest.artifacts['module:sidefx-cli/providers/http/transport'] = `sha256:${'0'.repeat(64)}`;
+  await writeFile(f.profile, JSON.stringify(f.manifest));
+  const changed = await cli(f.root, ['provider', 'evaluate', 'custom/service']);
+  assert.equal(changed.error.code, 'RUNTIME_ARTIFACT_CHANGED');
+  delete f.manifest.artifacts['module:sidefx-cli/providers/http/transport'];
+  f.manifest.args[0] = { artifact: 'module:sidefx-cli/providers/http/unpinned' };
+  await writeFile(f.profile, JSON.stringify(f.manifest));
+  const unpinned = await cli(f.root, ['provider', 'evaluate', 'custom/service']);
+  assert.equal(unpinned.error.code, 'RUNTIME_BINDING_REJECTED');
+  assert.equal(f.requests.length, 1);
+});
