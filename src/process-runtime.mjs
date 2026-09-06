@@ -143,7 +143,7 @@ export class ConfiguredRuntime {
         catch { reject(new SidefxError('RUNTIME_PROTOCOL_REJECTED', 'Provider stdout must contain exactly one JSON response.', 4)); }
       });
       child.stdin.end(JSON.stringify({ protocol: 'sfx-runtime-request.v1', capabilityId: fields.capabilityId,
-        capabilityAuthorityDigest: fields.capabilityAuthorityDigest, input: fields.input }));
+        capabilityAuthorityDigest: fields.capabilityAuthorityDigest, input: fields.input, command: fields.command }));
     });
   }
 }

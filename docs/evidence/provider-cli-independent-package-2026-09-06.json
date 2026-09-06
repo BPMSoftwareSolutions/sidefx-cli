@@ -1,0 +1,26 @@
+{
+  "evidenceType": "sfx-independent-provider-package-proof.v1",
+  "archive": "sidefx-cli-0.1.0.tgz",
+  "integrity": "sha512-ahpLbaToaut5dQZ8mU1kz4cmMVTxs9Yb4S0vIWI396XiP2frNG8QGRyHQkC7oHqLFjQVEP75b+AHnp51keZyDg==",
+  "providerFilesInCli": 0,
+  "command": "C:\\lab\\repos\\sidefx-cli\\.sidefx\\entity-neutral-package-smoke\\installed\\node_modules\\.bin\\sfx.cmd provider evaluate rapidapi/yahoo-finance166 --estate C:\\lab\\repos\\agentic-harness --json",
+  "executionId": "exec-550285e9-a31e-4081-b4c1-83f51f5a0a94",
+  "receiptDigest": "sha256:6f5e3c8728b5381da8727c0e9f8231429bc6a6e019b43e90c45e7c996403eb8b",
+  "binding": {
+    "object": "provider",
+    "verb": "evaluate",
+    "capabilityId": "evaluate-http-provider",
+    "authorityDigest": "sha256:9d3ce7d04c87cb5b662aacff8bd6fd06290d2c69fd8e8ec246a344ad1fb263e2",
+    "subject": "rapidapi/yahoo-finance166",
+    "source": "ENTITY_OPERATION_AUTHORITY",
+    "entityDigest": "sha256:4157c3bfc0453c331964798f84fdb42b579b8b5040a528516c778508e79f6bd4",
+    "routeDigest": "sha256:72b1953ce58557e10411e023f5acf47981b504a2a17ff85b3064a5c7a01a3386",
+    "operation": "evaluate"
+  },
+  "disposition": "PASSED",
+  "httpStatus": 200,
+  "nativeStatus": "OK",
+  "providerPackage": "@sidefx/http-provider@0.1.1",
+  "providerPackageLocation": "C:\\lab\\repos\\agentic-harness\\node_modules\\@sidefx\\http-provider",
+  "receiptVerifiedThroughSfx": true
+}

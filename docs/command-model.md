@@ -121,23 +121,22 @@ sfx provider admit <provider> --via <admission-capability> --input @admission.js
 
 The CLI supports these commands, but a command is not an implementation of a
 provider evaluator or admission authority. Missing bindings return
-`CAPABILITY_ROUTE_REQUIRED`. A bound operation without canonical input returns
-`INPUT_REQUIRED`. A provider test never silently becomes a capsule fixture test.
+`CAPABILITY_ROUTE_REQUIRED`. Providers validate the input required by their own
+contracts. A provider test never silently becomes a capsule fixture test.
 `capability evaluate ID` remains explicitly scoped to capsule fixtures unless
 delegated. A delivered `PROVIDER_REQUIRED`, rejection or hold keeps its meaning.
 
-Entity-specific values belong in canonical request/configuration data. Native-input
-capabilities receive the caller's exact input. A capability explicitly declaring
-`sfx-semantic-command.v1` receives `{ contractId, command }`, with the complete
-validated command including optional `input`. Its authority owns the relationship
-between the declared entity and the operation. This is a shared envelope, not an
-instance-specific projection. Requests are snapshotted before asynchronous lookup.
+Entity-specific values belong in canonical request/configuration data. Capabilities
+receive the caller's exact input. The process protocol also transports the complete
+validated command separately. The provider owns any domain-specific interpretation
+or input-envelope construction. The CLI never branches on a capability's input
+contract identity. Requests are snapshotted before asynchronous lookup.
 
-The supplied project configuration binds `provider evaluate` to the separate local
-`evaluate-http-provider` capability. For example:
+Each Harness provider descriptor binds its supported operations to exact capability
+authority. The currently configured Finance166 example is:
 
 ```text
-sfx provider evaluate rapidapi/yahoo-finance166 --json
+sfx provider evaluate rapidapi/yahoo-finance166 --estate C:\lab\repos\agentic-harness --json
 ```
 
 That capability accepts the shared command envelope, resolves a declared operation
@@ -196,6 +195,21 @@ fields, with `authorityDigest` replacing `capsuleDigest`. It binds capability
 meaning without pretending that a local provider owns an estate capsule. The
 runtime manifest independently pins the physical provider and configuration bytes.
 Neither document contains embedded credentials or automatic runtime-selection policy.
+
+An entity can declare `commandBindings` in its public metadata. Each entry contains
+`object`, `verb`, `capabilityId`, and exactly one `capsuleDigest` or `authorityDigest`.
+Bindings match the requested entity type and operation exactly. Provider catalogs
+expose this metadata; capability representations project it from their authority.
+No operation is inferred from a provider name, transport, candidate list or a
+capability's input contract name. Duplicate bindings and stale authority pins fail
+before invocation. Native views can delegate when their entity declares a binding.
+
+Selection order is explicit `--via`, explicit `--routes`, entity operation metadata,
+then a matching configured default route. A missing binding remains unavailable.
+The selected provider receives unchanged native `input` and separate `command`
+context over the shared process protocol. The CLI does not construct domain input
+envelopes. Receipts bind both inputs and the exact entity descriptor that selected
+the target capability.
 
 `sfx.config.json` supplies catalog paths, default route paths and explicit process
 runtime manifests. Paths resolve relative to the configuration file, including when

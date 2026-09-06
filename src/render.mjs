@@ -1,4 +1,4 @@
-import { projectSemanticRequest } from './commands.mjs';
+import { projectSemanticRequest, semanticCommand } from './commands.mjs';
 
 const pretty = value => JSON.stringify(value, null, 2);
 const safe = value => String(value ?? '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '');
@@ -61,6 +61,7 @@ function format(request, value) {
   return pretty(value);
 }
 
-export function render(request, value) {
-  return safe(format(request.object ? projectSemanticRequest(request) : request, value));
+export function render(request, value, vocabulary) {
+  if (semanticCommand(request.object, request.verb, vocabulary)?.declared) return safe(pretty(value));
+  return safe(format(request.object ? projectSemanticRequest(request, vocabulary) : request, value));
 }

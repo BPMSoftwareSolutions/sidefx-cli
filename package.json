@@ -11,13 +11,8 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "bin": { "sfx": "bin/sfx.mjs" },
-  "exports": {
-    ".": "./src/index.mjs",
-    "./providers/http": "./packages/http-provider/worker.mjs",
-    "./providers/http/transport": "./packages/http-provider/http.mjs",
-    "./providers/http/credentials": "./packages/http-provider/credentials.mjs"
-  },
-  "files": ["bin/", "src/", "README.md", "AGENTS.md", "docs/", "examples/", "packages/", "config/", "scripts/"],
+  "exports": "./src/index.mjs",
+  "files": ["bin/", "src/", "README.md", "AGENTS.md", "docs/", "examples/", "scripts/"],
   "scripts": {
     "start": "node bin/sfx.mjs",
     "test": "node --test test/cli.test.mjs test/core.test.mjs test/runtime.test.mjs test/neutrality.test.mjs test/provider-runtime.test.mjs",

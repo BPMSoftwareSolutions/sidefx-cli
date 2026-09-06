@@ -1,6 +1,0 @@
-{
-  "configurationType": "sfx-project.v1",
-  "catalogs": ["../config/provider-catalog.json"],
-  "routes": "../config/routes.json",
-  "runtimes": ["../packages/http-provider/runtime.json"]
-}

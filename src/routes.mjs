@@ -7,7 +7,31 @@ export const delegatedVerbs = ['evaluate', 'assimilate', 'author', 'resolve', 'i
 const routeFields = new Set(['object', 'verb', 'subject', 'capabilityId', 'capsuleDigest']);
 const authorityRouteFields = new Set(['object', 'verb', 'subject', 'capabilityId', 'authorityDigest']);
 
-export async function resolveRoute(routesPath, verb, subject, object) {
+// Operation relationships are public entity metadata. No target identity or domain
+// is inferred from names, transports, candidate lists, or contract vocabulary.
+export function resolveEntityOperation(entity, { object, verb, subject }, vocabulary) {
+  const bindings = entity.commandBindings ?? [];
+  requireValue(Array.isArray(bindings), 'ENTITY_BINDING_REJECTED', 'Expected an array of declared command bindings.', 2);
+  const seen = new Set();
+  for (const binding of bindings) {
+    requireValue(binding && typeof binding === 'object' && !Array.isArray(binding)
+      && Object.keys(binding).every(key => ['object', 'verb', 'capabilityId', 'capsuleDigest', 'authorityDigest'].includes(key))
+      && semanticCommand(binding.object, binding.verb, vocabulary)?.bindable && isCapabilityId(binding.capabilityId)
+      && ['capsuleDigest', 'authorityDigest'].filter(key => Object.hasOwn(binding, key)).length === 1
+      && /^sha256:[a-f0-9]{64}$/.test(binding.capsuleDigest ?? binding.authorityDigest),
+    'ENTITY_BINDING_REJECTED', 'An entity operation requires its declared type, operation, capability and one exact authority pin.', 2);
+    const key = JSON.stringify([binding.object, binding.verb]);
+    requireValue(!seen.has(key), 'ENTITY_BINDING_AMBIGUOUS', 'An entity declares multiple bindings for the same operation.', 2);
+    seen.add(key);
+  }
+  const binding = bindings.find(item => item.object === object && item.verb === verb);
+  if (!binding) return null;
+  return { ...binding, subject, source: 'ENTITY_OPERATION_AUTHORITY',
+    entityDigest: entity.descriptorDigest ?? entity.capabilityAuthorityDigest ?? entity.receiptDigest,
+    routeDigest: digest(binding) };
+}
+
+export async function resolveRoute(routesPath, verb, subject, object, vocabulary) {
   requireValue(routesPath, 'CAPABILITY_ROUTE_REQUIRED',
     `${verb} requires an explicit capability binding. Use --via CAPABILITY --input @request.json, or --routes FILE.`);
   const document = await readJson(routesPath);
@@ -27,7 +51,7 @@ export async function resolveRoute(routesPath, verb, subject, object) {
     requireValue(!typed || Object.keys(route).every(field => (authorityRoutes ? authorityRouteFields : routeFields).has(field)), 'ROUTES_REJECTED',
       'Routes contain only object, verb, subject, capabilityId and the versioned authority pin; domain configuration belongs in canonical input.', 2);
     const key = JSON.stringify([route.object ?? null, route.verb, route.subject]);
-    requireValue((typed ? semanticCommand(route.object, route.verb)?.bindable
+    requireValue((typed ? semanticCommand(route.object, route.verb, vocabulary)?.bindable
       : route.object === undefined && delegatedVerbs.includes(route.verb)) && typeof route.subject === 'string'
       && route.subject.length > 0 && isCapabilityId(route.capabilityId)
       && /^sha256:[a-f0-9]{64}$/.test(authorityRoutes ? route.authorityDigest : route.capsuleDigest) && !keys.has(key),

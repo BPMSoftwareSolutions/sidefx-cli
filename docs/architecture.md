@@ -29,12 +29,17 @@ sfx argv / canonical JSON
 
 ## Ownership
 
-The CLI/SDK contains command parsing, process transport, representation and local
-delivery receipts. The separately packaged `packages/http-provider` implementation
-owns its capability's request admission, credential resolution, HTTP effects and
-declared response evaluation. Project configuration explicitly binds it as a local
-installed provider. It does not modify the Harness, copy its runtime, evaluate its
-semantic expressions or implement another managed lifecycle.
+The CLI/SDK contains command parsing, public metadata inspection, process transport,
+representation and local delivery receipts. It contains no domain provider implementation
+or provider-specific contract dispatch. Entity metadata declares exact operation-to-capability
+relationships; the selected estate supplies runtime bindings and capability authority.
+Providers own input interpretation, effects, credentials and outcome meaning.
+
+The HTTP reference provider is a separate package installed in Harness. Its source
+remains under `packages/http-provider` for maintenance and tests, but neither its
+implementation nor vendor configuration is included in the CLI package or exports.
+The CLI does not copy the estate runtime, evaluate its semantic expressions or
+implement another managed lifecycle.
 
 Local process capabilities carry a `sfx-capability-representation.v1` authority
 document and `sfx-process-runtime.v1` physical binding. Their authority and runtime
@@ -45,10 +50,12 @@ Harness admission or publication, and are not signatures. Such a capability has
 no capsule digest and is never projected as an estate capsule.
 
 The generic process driver passes one JSON request on stdin and expects one JSON
-response on stdout, with bounded output and a timeout. It uses no shell, drains
-diagnostics separately, and preserves the provider's result. Node is the selected
-HTTP implementation because these are deterministic HTTP/JSON mechanics; the
-protocol permits an explicitly configured executable from another runtime family.
+response on stdout, with bounded output and a timeout. The envelope carries the
+exact capability identity and authority digest, unchanged native `input`, and
+optional unchanged `command` context. It constructs no capability-specific input
+wrapper. Native capsule invocation continues to receive the exact canonical input.
+The driver uses no shell, drains diagnostics separately, and preserves the provider's
+result. The protocol permits any explicitly configured executable runtime.
 Automatic eligibility ranking remains a separate capability responsibility.
 
 The adapter imports the selected estate's installed `sda-bootstrap` exports:
@@ -122,10 +129,10 @@ admission or publication claim. The Harness's separate RapidAPI tokens retain
 their open event-mechanic slots; this configured provider does not close those slots.
 
 Harness now owns the executable evaluation configuration: capability authority,
-operation descriptors, catalog, surface route and process connection. The selected
+operation descriptors, catalog operation bindings and process connection. The selected
 estate's configuration takes precedence over the invoking project's defaults.
 The HTTP provider receives both the Harness operation file and its exact capability
-authority file. Installed package exports locate generic mechanics, with artifact
+authority file. Independently installed package exports locate mechanics, with artifact
 digests checked before invocation. No absolute source-checkout path is required by
 the Harness connection. Scope and source paths are retained in the execution receipt.
 
@@ -135,6 +142,9 @@ current managed authority.
 
 ## Receipts and process outcomes
 
+Receipts retain entity and operation-binding digests, native input and command
+digests, exact capability authority, and runtime binding. Optional metadata is
+serialized before hashing so sparse public representations remain verifiable.
 Receipt files begin in `RUNNING` before a capability executes, then atomically
 transition to `RETURNED` or `DELIVERY_FAILED`. A failure to create the initial
 receipt prevents execution. Failure to finalize a returned result reports that

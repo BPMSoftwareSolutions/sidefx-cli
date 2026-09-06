@@ -24,6 +24,10 @@ architecture invariant for this repository. Provider Neutrality is one case of i
 - Preserve the working Node interface and documented compatibility forms. Runtime
   eligibility follows required profiles and admitted provider evidence, not the
   implementation language of this CLI.
+- The CLI package contains no provider implementation, vendor configuration or
+  capability-specific contract dispatch. Resolve targets through estate entity
+  metadata or explicit bindings. Forward command and canonical input unchanged
+  through the shared invocation protocol; providers own their input interpretation.
 
 Run `npm test` for changes to commands, routing, dispatch or representations.
 The entity-neutrality suite must remain part of that command and CI. When changing

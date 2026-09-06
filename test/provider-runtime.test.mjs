@@ -6,7 +6,7 @@ import { readFile, writeFile, copyFile, mkdir } from 'node:fs/promises';
 import { once } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bytesDigest } from '../src/data.mjs';
+import { bytesDigest, digest } from '../src/data.mjs';
 import { temporary } from './helpers.mjs';
 import { createSidefx, loadConfiguration } from '../src/index.mjs';
 
@@ -249,9 +249,14 @@ test('an estate with no configuration cannot silently execute the current direct
 
 test('estate declarative bindings resolve installed package mechanics and reject unpinned or changed artifacts', async t => {
   const f = await fixture(t, (req, res) => res.end('{"item":"one"}'));
-  const files = { 'module:sidefx-cli/providers/http': 'worker.mjs',
-    'module:sidefx-cli/providers/http/transport': 'http.mjs',
-    'module:sidefx-cli/providers/http/credentials': 'credentials.mjs' };
+  const installedProvider = path.join(f.root, 'node_modules', '@sidefx', 'http-provider');
+  await mkdir(installedProvider, { recursive: true });
+  for (const name of ['package.json', 'worker.mjs', 'http.mjs', 'credentials.mjs']) {
+    await copyFile(path.join(packageRoot, name), path.join(installedProvider, name));
+  }
+  const files = { 'module:@sidefx/http-provider': 'worker.mjs',
+    'module:@sidefx/http-provider/transport': 'http.mjs',
+    'module:@sidefx/http-provider/credentials': 'credentials.mjs' };
   for (const [reference, name] of Object.entries(files)) {
     f.manifest.artifacts[reference] = bytesDigest(await readFile(path.join(packageRoot, name)));
     delete f.manifest.artifacts[name];
@@ -263,7 +268,7 @@ test('estate declarative bindings resolve installed package mechanics and reject
   f.manifest.artifacts['capability.json'] = bytesDigest(await readFile(path.join(f.providerRoot, 'capability.json')));
   f.routes.routes[0].authorityDigest = f.manifest.artifacts['capability.json'];
   await writeFile(path.join(f.root, 'routes.json'), JSON.stringify(f.routes));
-  f.manifest.args = [{ artifact: 'module:sidefx-cli/providers/http' }, { artifact: 'config.json' }, { artifact: 'capability.json' }];
+  f.manifest.args = [{ artifact: 'module:@sidefx/http-provider' }, { artifact: 'config.json' }, { artifact: 'capability.json' }];
   await writeFile(f.profile, JSON.stringify(f.manifest));
   const project = JSON.parse(await readFile(path.join(f.root, 'sfx.config.json'), 'utf8'));
   project.estate = '.';
@@ -273,14 +278,102 @@ test('estate declarative bindings resolve installed package mechanics and reject
   assert.equal(result.value.result.disposition, 'PASSED');
   const observed = await cli(f.root, ['execution', 'observe', result.value.executionId]);
   assert.equal(observed.value.capability.authorityScope, 'ESTATE_CONFIGURED_CAPABILITY');
-  f.manifest.artifacts['module:sidefx-cli/providers/http/transport'] = `sha256:${'0'.repeat(64)}`;
+  f.manifest.artifacts['module:@sidefx/http-provider/transport'] = `sha256:${'0'.repeat(64)}`;
   await writeFile(f.profile, JSON.stringify(f.manifest));
   const changed = await cli(f.root, ['provider', 'evaluate', 'custom/service']);
   assert.equal(changed.error.code, 'RUNTIME_ARTIFACT_CHANGED');
-  delete f.manifest.artifacts['module:sidefx-cli/providers/http/transport'];
-  f.manifest.args[0] = { artifact: 'module:sidefx-cli/providers/http/unpinned' };
+  delete f.manifest.artifacts['module:@sidefx/http-provider/transport'];
+  f.manifest.args[0] = { artifact: 'module:@sidefx/http-provider/unpinned' };
   await writeFile(f.profile, JSON.stringify(f.manifest));
   const unpinned = await cli(f.root, ['provider', 'evaluate', 'custom/service']);
   assert.equal(unpinned.error.code, 'RUNTIME_BINDING_REJECTED');
   assert.equal(f.requests.length, 1);
+});
+
+async function opaqueEstate(t) {
+  const root = await temporary(t);
+  const save = async (name, value) => writeFile(path.join(root, name), JSON.stringify(value));
+  await writeFile(path.join(root, 'worker.mjs'), `
+    import { readFile } from 'node:fs/promises';
+    const authority = JSON.parse(await readFile(process.argv[2], 'utf8'));
+    const chunks = []; for await (const chunk of process.stdin) chunks.push(chunk);
+    const request = JSON.parse(Buffer.concat(chunks).toString());
+    process.stdout.write(JSON.stringify({ protocol: 'sfx-runtime-response.v1', capabilityId: authority.capabilityId,
+      result: { disposition: 'FIXTURE_RETURNED', contract: authority.inputContractId,
+        input: request.input, command: request.command } }));
+  `);
+  const bindings = [];
+  for (const name of ['second', 'first']) {
+    const capabilityId = `opaque-${name}`;
+    const authority = { representationType: 'sfx-capability-representation.v1', capabilityId, capabilityVersion: '1.0.0',
+      inputContractId: `unfamiliar-${name}-contract.v7`, contracts: {}, scenarios: [{ scenarioId: `scenario-${name}` }],
+      // An entity's operation may delegate to a completely different capability.
+      commandBindings: name === 'first' ? [{ ...bindings[0], object: 'capability' }] : [] };
+    await save(`${name}.json`, authority);
+    const pin = bytesDigest(await readFile(path.join(root, `${name}.json`)));
+    bindings.push({ object: 'provider', verb: 'evaluate', capabilityId, authorityDigest: pin });
+    await save(`${name}.runtime.json`, { runtimeType: 'sfx-process-runtime.v1', executable: process.execPath,
+      args: [{ artifact: 'worker.mjs' }, { artifact: `${name}.json` }], providerId: `fixture/${name}`,
+      profileId: `unfamiliar-${name}-profile`, runtimeFamily: 'node',
+      artifacts: { 'worker.mjs': bytesDigest(await readFile(path.join(root, 'worker.mjs'))), [`${name}.json`]: pin },
+      capabilities: { [capabilityId]: `${name}.json` } });
+  }
+  const catalog = { catalogType: 'sfx-provider-catalog.v1', providers: bindings.map((binding, index) => ({
+    providerId: `arbitrary/service-${index}`, name: `Fixture ${index}`, source: { kind: 'DECLARED', reference: 'fixture:entity-authority' },
+    operations: [], candidateCapabilities: [bindings[1 - index].capabilityId], commandBindings: [binding],
+  })) };
+  await save('catalog.json', catalog);
+  await save('sfx.config.json', { configurationType: 'sfx-project.v1', estate: '.', catalogs: ['catalog.json'],
+    runtimes: ['first.runtime.json', 'second.runtime.json'] });
+  return { root, catalog, save };
+}
+
+test('entity metadata selects unrelated capabilities and transports their native input without contract knowledge', async t => {
+  const f = await opaqueEstate(t);
+  for (const [index, input] of [[0, { samples: [2, 5], nativeOption: 'exact' }], [1, false]]) {
+    const result = await cli(f.root, ['provider', 'evaluate', `arbitrary/service-${index}`, '--input', JSON.stringify(input)]);
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.value.result.disposition, 'FIXTURE_RETURNED');
+    assert.deepEqual(result.value.result.input, input);
+    assert.deepEqual(result.value.result.command, { object: 'provider', verb: 'evaluate', subject: `arbitrary/service-${index}`, input });
+    const receipt = await cli(f.root, ['execution', 'observe', result.value.executionId]);
+    assert.equal(receipt.code, 0, receipt.stderr);
+    assert.equal(receipt.value.capability.capabilityId, f.catalog.providers[index].commandBindings[0].capabilityId);
+    assert.equal(receipt.value.context.source, 'ENTITY_OPERATION_AUTHORITY');
+    assert.equal(receipt.value.context.entityDigest, digest(f.catalog.providers[index]));
+    assert.equal(receipt.value.inputDigest, digest(input));
+    assert.equal(receipt.value.commandDigest, digest(result.value.result.command));
+  }
+});
+
+test('capability operation metadata overrides a built-in view through the same invocation abstraction', async t => {
+  const f = await opaqueEstate(t);
+  const result = await cli(f.root, ['capability', 'evaluate', 'opaque-first', '--input', '{"different":"contract"}']);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.value.result.contract, 'unfamiliar-second-contract.v7');
+  assert.equal(result.value.result.command.object, 'capability');
+  assert.deepEqual(result.value.result.input, { different: 'contract' });
+  // Metadata also works when no caller input was supplied.
+  const noInput = await cli(f.root, ['capability', 'evaluate', 'opaque-first']);
+  assert.equal(noInput.code, 0, noInput.stderr);
+  assert.equal(noInput.value.result.contract, 'unfamiliar-second-contract.v7');
+});
+
+test('undeclared, mistyped, ambiguous and stale entity bindings never fall back to a guessed evaluator', async t => {
+  const f = await opaqueEstate(t);
+  const entity = f.catalog.providers[0];
+  const original = structuredClone(entity.commandBindings[0]);
+  for (const [bindings, code] of [
+    [[], 'CAPABILITY_ROUTE_REQUIRED'],
+    [[{ ...original, object: 'capability' }], 'CAPABILITY_ROUTE_REQUIRED'],
+    [[original, original], 'ENTITY_BINDING_AMBIGUOUS'],
+    [[{ ...original, authorityDigest: `sha256:${'0'.repeat(64)}` }], 'ROUTE_STALE'],
+    [[{ ...original, provider: 'guessed-provider' }], 'ENTITY_BINDING_REJECTED'],
+  ]) {
+    entity.commandBindings = bindings;
+    await f.save('catalog.json', f.catalog);
+    const result = await cli(f.root, ['provider', 'evaluate', entity.providerId]);
+    assert.equal(result.error.code, code, result.stderr);
+    assert.equal(result.error.details?.executionId, undefined, 'Reject before provider execution starts');
+  }
 });

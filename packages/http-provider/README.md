@@ -10,7 +10,7 @@ owns the active capability's meaning, input/event/outcome identities, contract
 vocabulary and required provider profile. Its runtime connection passes that exact
 file as the worker's second argument, after the operation-descriptor file. The
 worker validates the authority digest before executing. The bundled `capability.json`
-and `runtime.json` remain examples for explicitly configured standalone use.
+remains an example authority for explicitly configured standalone use.
 The selected Node
 implementation uses built-in HTTP, JSON and operating-system mechanics. Python,
 .NET, JVM, Go and services remain eligible implementations of the same contract;
@@ -55,22 +55,29 @@ third-party sensitive content is outside that redaction claim.
 
 ## Changing the local binding
 
-Harness connections use `module:sidefx-cli/providers/http` and its transport and
-credential exports to locate the installed provider without depending on a source
-checkout. Every selected artifact is digest-bound. Artifact arguments refer only
-to those pinned entries. The operation and capability files are owned by Harness;
-the CLI contains no provider-specific routing branches.
+Harness connections use `module:@sidefx/http-provider` and its `transport` and
+`credentials` exports. This package is installed separately in the estate and
+is not a CLI dependency or export. Every selected artifact is digest-bound.
+The operation and capability files are owned by Harness. The provider constructs
+its own domain input from the shared protocol's command context; native input
+invocation is also supported. The CLI knows neither this contract nor these effects.
 
 After reviewing changes to declared artifacts or configuration, update their local
 digests from the repository root:
 
 ```text
-node scripts/bind-runtime.mjs packages/http-provider/runtime.json
+node scripts/bind-runtime.mjs C:\lab\repos\agentic-harness\authority\provider-connections\bounded-http.runtime.json
 ```
 
-If `capability.json` changes, update the route's `authorityDigest` to its new
+If the capability authority changes, update its entity operation binding's `authorityDigest` to the new
 artifact digest as part of that review. Rebinding does not qualify new mechanics;
 run the applicable provider/CLI tests. The shared transport tests cover multiple
 provider namespaces, GET and POST, failed preconditions, denial, redirects,
 invalid JSON, failed field checks, response bounds, timeout, redaction, binding
 drift and receipt failure through the actual CLI.
+
+The current local build is `@sidefx/http-provider@0.1.1`. It is packed and installed
+independently of `sidefx-cli`. The development installation in Harness uses the
+local archive and leaves its bootstrap dependency and lockfile unchanged. This
+provider is not published to a registry; reinstall it after a clean dependency
+reset. Provider packaging and delivery do not change the generic CLI protocol.

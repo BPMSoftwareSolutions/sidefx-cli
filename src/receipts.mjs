@@ -15,7 +15,8 @@ export class ReceiptStore {
   }
 
   async save(receipt, exclusive = false) {
-    const safe = redact(receipt);
+    // Digest the JSON that is actually persisted, including omitted optional metadata.
+    const safe = JSON.parse(JSON.stringify(redact(receipt)));
     await writeJson(this.file(receipt.executionId), { ...safe, receiptDigest: digest(safe) }, { exclusive });
     return { ...safe, receiptDigest: digest(safe) };
   }
@@ -39,7 +40,7 @@ export class ReceiptStore {
     }));
   }
 
-  async execute({ verb, subject, capability, estateManifestDigest, input, context = null }, operation) {
+  async execute({ verb, subject, capability, estateManifestDigest, input, command, context = null }, operation) {
     const executionId = `exec-${randomUUID()}`;
     const receipt = {
       receiptType: 'sfx-execution-testimony.v1', evidenceScope: 'LOCAL_DELIVERY_TESTIMONY',
@@ -55,6 +56,7 @@ export class ReceiptStore {
           authorityScope: capability.authorityScope, managedAdmission: capability.managedAdmission } : {}),
       },
       inputDigest: input === undefined ? null : digest(input),
+      ...(command === undefined ? {} : { commandDigest: digest(command) }),
     };
     // Fail before executing an effect if its delivery receipt cannot be recorded.
     await this.save(receipt, true);

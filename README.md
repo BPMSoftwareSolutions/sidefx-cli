@@ -13,8 +13,9 @@ provider is never represented as an admitted estate capsule.
 **Capability requirements determine the required profile. Eligible admitted
 providers are resolved against constraints and evidence. The selected provider
 determines the physical runtime.** Python, Node, Go, C#, Java and external services
-may satisfy different profiles. The current CLI does not yet implement that
-general provider-resolution circuit. Its shared SDK is a useful integration seam.
+may satisfy different profiles. The CLI reads declared operation bindings from
+estate entity metadata and invokes the exact selected capability. Eligibility
+decisions and provider-specific input interpretation belong behind that boundary.
 See the [responsibility and runtime review](docs/responsibility-runtime-review.md).
 
 **Entity Neutrality Law:** no entity instance, business domain, provider or
@@ -40,7 +41,8 @@ and capsule authority, rather than standalone top-level commands.
 
 Requires Node.js 20 or newer. This package has no npm dependencies. The estate
 must have its own pinned runtime installed (`npm ci` in that estate when needed).
-The supplied local HTTP evaluation provider works independently of an estate.
+Provider implementations are installed separately in the selected estate; none is
+bundled as a CLI dependency or export.
 
 Clone the repository, or open the existing workspace at
 `C:\lab\repos\sidefx-cli`:
@@ -74,8 +76,9 @@ sfx provider evaluate rapidapi/yahoo-finance166 --estate C:\lab\repos\agentic-ha
 
 Harness owns `sfx.config.json`, the `evaluate-http-provider` capability authority,
 the provider catalog, operation descriptors and runtime connection under `authority/`.
-The connection selects a separate [HTTP provider package](packages/http-provider/README.md)
-delivered with the installed CLI. Package exports locate the mechanics; the Harness
+The connection selects the independently installed `@sidefx/http-provider` package.
+Its source is maintained as a separate package under `packages/http-provider` in
+this repository and is excluded from the CLI distribution. Package exports locate the mechanics; the Harness
 connection pins their bytes and supplies the exact Harness authority and operation files.
 It uses the existing Windows user environment variable `RAPID_API_KEY`;
 the credential is resolved inside the provider. On another OS, configure an
@@ -85,6 +88,10 @@ The September 6 [Harness CLI test](docs/rapidapi-provider-smoke-test-2026-09-06.
 returned HTTP 200, native `status: OK`, and `PASSED` for Finance166 news. It checked
 the native status and the `data` and `data.main` object fields. The execution receipt
 retains the Harness authority path, runtime connection path and their exact digests.
+Each provider descriptor declares its own `commandBindings`; there is no default
+HTTP evaluator. The CLI does not recognize this capability's identity or input
+contract. It forwards canonical input and command context unchanged. The provider
+interprets both according to its own contract.
 The other three supplied provider operations are also declared in Harness;
 their earlier HTTP observations are identified separately in the report.
 
@@ -105,9 +112,9 @@ estate selection, the current directory's configuration is used; Harness's file
 declares `estate: "."`. Explicit `--config` takes precedence. A selected estate
 with no configuration never falls back to a different project's provider.
 Paths resolve relative to the selected file. Explicit `--catalog` and `--routes`
-override their project defaults. The former CLI-local binding is now an opt-in
-[example](examples/local-http.config.json), rather than the default configuration.
-Default routes apply only to matching object/operation/identity keys. Missing
+override their project defaults. Duplicated provider configuration has been removed
+from the CLI repository. Explicit `--via` and `--routes` remain supported.
+Entity bindings precede default routes; default routes apply only to matching keys. Missing
 bindings keep their explicit error; no provider is selected by name heuristics.
 
 ## Use an estate

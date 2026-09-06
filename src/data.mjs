@@ -60,7 +60,8 @@ export function redact(value) {
   if (Array.isArray(value)) return value.map(redact);
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([key, child]) => [key,
-      /^(authorization|proxy-authorization|cookie|set-cookie|password|secret|token|access[_-]?token|refresh[_-]?token|api[_-]?key|x-rapidapi-key)$/i.test(key)
+      /^(authorization|proxy-authorization|cookie|set-cookie|password|secret|token|access[_-]?token|refresh[_-]?token)$/i.test(key)
+        || /(?:^|[-_])[a-z0-9]*api[-_]?key$/i.test(key)
         ? '[REDACTED]' : redact(child),
     ]));
   }

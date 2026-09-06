@@ -1,5 +1,20 @@
 # RapidAPI provider smoke test — 2026-09-06
 
+## Verified execution after enforcing information hiding
+
+The latest [live execution](evidence/provider-cli-neutral-dispatch-2026-09-06.json),
+`exec-0d1f020e-b2ac-46cf-a6f0-054225bb708a`, returned HTTP 200, native `status: OK`
+and `PASSED` with the same three response checks. The command was run from the
+user's home directory against the explicitly selected Harness estate.
+
+Dispatch now reads the provider's declared operation binding from its Harness
+descriptor. The wildcard HTTP route was removed. The HTTP provider is installed
+independently in Harness as `@sidefx/http-provider@0.1.1`; it is excluded from the
+CLI package. The CLI forwards native input and command context without knowing
+the selected capability's input contract, HTTP behavior or response semantics.
+The receipt records `ENTITY_OPERATION_AUTHORITY` and the exact descriptor digest.
+Earlier implementation and packaging descriptions below are historical.
+
 ## Completed Harness-configured CLI execution
 
 The repaired command now loads Harness's capability authority, provider descriptors,

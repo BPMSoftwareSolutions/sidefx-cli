@@ -1,5 +1,26 @@
 # Verification — September 6, 2026
 
+## Information hiding and entity operation dispatch
+
+All 51 tests pass after removing provider implementations and configuration from
+the CLI distribution and deleting the capability-specific input-envelope branch.
+New actual-process tests use unfamiliar contracts and different capability targets
+declared by entity metadata, preserve native object and boolean inputs, override a
+native capability view through its declared operation, and reject missing, mistyped,
+ambiguous and stale bindings without choosing an evaluator. Sparse authority
+metadata also produces a verifiable receipt.
+
+The HTTP provider is independently installed in Harness as `@sidefx/http-provider@0.1.1`.
+The final [live CLI evidence](evidence/provider-cli-neutral-dispatch-2026-09-06.json)
+records `ENTITY_OPERATION_AUTHORITY` selection, HTTP 200, native `status: OK`, and
+`PASSED` with all three response checks passing. No wildcard HTTP route remains.
+
+The 219-capability estate integration passed with native invocation and receipt
+parity. A fresh CLI archive contained zero provider implementation or configuration
+files. Its installed command executed Finance166 through the independent Harness
+provider and returned HTTP 200 / `PASSED`; its [package proof](evidence/provider-cli-independent-package-2026-09-06.json)
+records the archive integrity, command, operation binding and verified receipt.
+
 ## Harness-owned configuration and installed provider execution
 
 All 48 CLI/SDK/process tests pass. Added coverage proves estate selection from

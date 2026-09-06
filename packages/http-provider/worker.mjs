@@ -136,7 +136,8 @@ try {
   fail(request.protocol === 'sfx-runtime-request.v1' && request.capabilityId === capabilityId
     && request.capabilityAuthorityDigest === sha(authorityBytes), 'AUTHORITY_IDENTITY_REJECTED');
   const configBytes = await readFile(process.argv[2]);
-  const result = await evaluate(request.input, JSON.parse(configBytes.toString('utf8').replace(/^\uFEFF/, '')), sha(configBytes));
+  const input = request.command ? { contractId: authority.inputContractId, command: request.command } : request.input;
+  const result = await evaluate(input, JSON.parse(configBytes.toString('utf8').replace(/^\uFEFF/, '')), sha(configBytes));
   process.stdout.write(JSON.stringify({ protocol: 'sfx-runtime-response.v1', capabilityId, result }));
 } catch (error) {
   const code = /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : 'PROVIDER_INPUT_OR_CONFIGURATION_REJECTED';

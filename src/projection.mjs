@@ -75,6 +75,7 @@ export function projectCapability({ inspection, capsule, featureDocument }) {
     experience: authority.value.experience ?? null,
     rootScenarioId: authority.value.rootScenarioId ?? plan.value.rootNodeId ?? null,
     authority,
+    commandBindings: authority.value.commandBindings ?? [],
     scenarios,
     blueprint,
     contracts,

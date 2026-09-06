@@ -1,0 +1,122 @@
+{
+  "evidenceType": "sfx-architecture-research-observation.v1",
+  "observedAt": "2026-09-06T23:40:33Z",
+  "scope": "Read-only research; no architectural decision adopted or capability admitted.",
+  "roots": {
+    "cli": "C:/lab/repos/sidefx-cli",
+    "estate": "C:/lab/repos/agentic-harness"
+  },
+  "commits": {
+    "cli": "478139c7097389efc0020cd63b1f767b6a38b225",
+    "estate": "b472234c8f245b6e648a873b2d32ff588825b504"
+  },
+  "workingTrees": "Both contain pre-existing uncommitted changes. Observations concern working-tree bytes unless marked HEAD.",
+  "estateManifestDigest": "sha256:c444ce69a98589e28003d7d2bace5abc51fce21d0d05458177e8d515e5d09937",
+  "observations": {
+    "manifestCapabilities": 219,
+    "capsuleFileDigestMismatches": 0,
+    "capsulesWithTopLevelNonemptyCommandBindingsInDecodedJsonEntries": 0,
+    "bindingOccurrencesAcrossDecodedMechanicAndOverlayArrays": 5507,
+    "distinctExplicitProviderNames": 22,
+    "distinctProviderCapabilityIds": 22,
+    "distinctProviderProfileIds": 36,
+    "providerNameExamples": [
+      "ScenarioKernel.NodePlatform.Schema.JsonSchemaContractAdmission",
+      "ScenarioKernel.NodePlatform.Execution.AuthorityTransformation",
+      "ScenarioKernel.NodePlatform.Effects.ExternalCredentialReferenceBinding"
+    ],
+    "configuredCatalogProviders": 4,
+    "configuredCapabilities": [
+      "evaluate-http-provider"
+    ],
+    "provisionedCapsuleFiles": 22,
+    "providerCountsAreNotAdmissionOrEligibilityClaims": true
+  },
+  "commands": [
+    {
+      "command": "sfx capability list --estate C:\\lab\\repos\\agentic-harness --json",
+      "cwd": "C:\\Users\\Sidney Jones",
+      "exitCode": 0,
+      "summary": {
+        "resultCount": 220
+      }
+    },
+    {
+      "command": "sfx provider list --estate C:\\lab\\repos\\agentic-harness --json",
+      "cwd": "C:\\Users\\Sidney Jones",
+      "exitCode": 0,
+      "summary": {
+        "providerCount": 4
+      }
+    },
+    {
+      "command": "sfx mechanic list --estate C:\\lab\\repos\\agentic-harness --json",
+      "cwd": "C:\\Users\\Sidney Jones",
+      "exitCode": 2,
+      "errorCode": "COMMAND_REJECTED"
+    }
+  ],
+  "reuseCandidates": [
+    {
+      "id": "operate-capsule-estate",
+      "authorityDigest": "sha256:6584e3187cc14f4d2ba46bf3af205b87c705646de4d85f1a6457628862c6a316",
+      "finding": "Admitted capsule operations; identity-based list is narrower than all-entity discovery."
+    },
+    {
+      "id": "deliver-capsule-estate-mcp",
+      "finding": "Installed bootstrap obtains tool descriptions and schemas through this delivery capability; five operation tools, not an all-entity inventory."
+    },
+    {
+      "id": "deliver-capability-change-cli",
+      "authorityDigest": "sha256:8462002f27946774bf3d2c686f8b2b00638f9fca2497d6f7b5ad233a00a4b058",
+      "finding": "Owns four change verbs and their canonical mappings. Not exposed by current sfx vocabulary."
+    },
+    {
+      "id": "construct-sidefx-evaluation-object-catalog",
+      "authorityDigest": "sha256:e8faa9dfb6ac0f4893d83588fc07c6953772fbcfd94f01e2a8465a081928f48c",
+      "finding": "Request pins a fixed seed file, digest, byte length, and NON_PRODUCTION_WAVE1_EVALUATION boundary."
+    },
+    {
+      "id": "resolve-sidefx-eligible-providers",
+      "authorityDigest": "sha256:e5230afac6ee9d421e2c0a372220f8d0febeb18d744e9a1d8c588053f0db6bf8",
+      "finding": "Requires caller-supplied providerBindings and NON_PRODUCTION_WAVE3_SPECIALIST_ASK boundary."
+    },
+    {
+      "id": "resolve-sidefx-semantic-knowledge-request",
+      "authorityDigest": "sha256:a464a54fd0d6e39d6b28ad6ae6edc65cc354992ca42d1991dd8286c1f3395644",
+      "finding": "Requires supplied catalog, identity/lexical entries, relationships, snapshot and policy digests; NON_PRODUCTION_WAVE2_RETRIEVAL."
+    },
+    {
+      "id": "resolve-sidefx-capability-precedents",
+      "authorityDigest": "sha256:f7c684ca95717672825d8c563d1efdab14684a51a7f4041b53ea3268222b05d1",
+      "finding": "Requires supplied indexed corpus/proof data; NON_PRODUCTION_WAVE4_AUTHORING_MEMORY."
+    }
+  ],
+  "fileDigests": {
+    "cli/src/commands.mjs": "sha256:ec01b381e4874ce7b2b52b2183dbd3ea13f797a38669fa07a1995f80afa3bcc7",
+    "cli/src/cli.mjs": "sha256:b00597b80e79778ae11958c3fcd5d1a2f15c259599c291f9dd9ddf59cbcc02ba",
+    "cli/src/configuration.mjs": "sha256:9e07f204c65c7baeebf2b182e9d37e632b74ff3a07623f3fdd55e2ed6679d6f7",
+    "cli/src/index.mjs": "sha256:642dd6d67af5ebd884f53b8be7d6e6dc1fa14796a656ed55fb59197120f0e789",
+    "cli/src/projection.mjs": "sha256:a6468a7f4a525ce6c60c76ec67bde7b55586c2c62fa52a07ca4f6eef03b5c25b",
+    "cli/src/runtime-worker.mjs": "sha256:27ccb297eed62713fee497d3e9cf273016e7a84ca47650bcf06380a7db71a76a",
+    "cli/src/process-runtime.mjs": "sha256:36ec6c1bb8c1714296b2d0e70de7771f34702a1fcb8bc8a20cf9d28f5826b3ca",
+    "cli/src/runtime-artifacts.mjs": "sha256:8a398a30870ab830369c04c1729be30b54dda5fced24e8fe0d932b4b7be451d6",
+    "cli/src/routes.mjs": "sha256:85499da2c571363d174d40ca4c0536962fd949f95a1358ecb52005c53bacc0b2",
+    "cli/src/render.mjs": "sha256:ef0cad0bf3691c17d26d0be7d821968111f32608c5d34a07d413e24af18d505f",
+    "cli/src/catalog.mjs": "sha256:64722d027ca2c7dee09de4b280a9b3873e123338a55ed37c32639b2d893ae552",
+    "cli/packages/json-discovery-provider/worker.mjs": "sha256:beac0b899dc8114da8a05aae6c0bda0c24a974b63fc1973d03ea14f1fd27eeea",
+    "cli/packages/http-provider/worker.mjs": "sha256:e8c85e4cd6494537478c1142f45ea2185dbb7319fee666e63bd7eb34bde30c19",
+    "cli/package.json": "sha256:34e2882717585df72697b5538fd44c54d0da0ce535544f1ebc1f2caeeea922a6",
+    "estate/sfx.config.json": "sha256:2176a5e56085e173becc6faed025648f6575d09e8da5e3b08aba3e07203255f9",
+    "estate/package.json": "sha256:75d2561c393c7472e5288c36d7d3217c1d4fb17972ea54ff8fcc7d218d80bcff",
+    "estate/package-lock.json": "sha256:fa835a41fe7d042bb4eae569e131e5ea96656fd98e472b7d84e15d49335f9dff",
+    "estate/authority/cli/provider-catalog.json": "sha256:8ab5aec58f1c5701edfe9591014d5ffa4f223e158a51a731cba7d9f156703e0f",
+    "estate/authority/provider-connections/bounded-http.runtime.json": "sha256:117ad5fa5eebe413ba91719af14b7f455f137ede147f123325e6505a99c704a1"
+  },
+  "limitations": [
+    "No external provider requests, dependency installs, implementation edits, provisioning or admission performed during this research.",
+    "No full test suite or clean-install experiment rerun; historical green tests do not certify the interrupted changes.",
+    "The provider-name census examines explicit fields and is not itself the proposed product discovery implementation.",
+    "Absence of a complete discovery service was not proved exhaustively across every possible capability composition."
+  ]
+}

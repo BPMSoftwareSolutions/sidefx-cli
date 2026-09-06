@@ -48,7 +48,7 @@ Executable operations require an explicit capability binding and canonical input
   Provider search/inspect, capability resolve/evaluate, capsule evaluate and
   provider/capability/capsule compare can also delegate with --via and --input.
   Use --routes FILE for bindings pinned to capsule digests (v2) or authority (v3).
-  Configured capabilities may accept the complete sfx-semantic-command.v1 envelope.
+  Entity metadata declares operation bindings; providers receive command and input.
   Project defaults apply only to matching routes; provider authority validates input.
 
 Compatibility: existing verb-first forms remain, including sfx invoke, inspect,
@@ -76,7 +76,7 @@ Exit 0 means delivery completed; inspect the returned domain disposition.
 Exit 2: usage/input. Exit 3: unavailable boundary. Exit 4: runtime/integrity.
 `;
 
-export function parseCommand(argv) {
+function parseOptions(argv) {
   let parsed;
   try {
     parsed = parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
@@ -87,16 +87,21 @@ export function parseCommand(argv) {
       json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' },
     } });
   } catch (error) { throw new SidefxError('USAGE_ERROR', error.message, 2); }
+  return parsed;
+}
+
+export function parseCommand(argv, vocabulary) {
+  const parsed = parseOptions(argv);
   const { values, positionals } = parsed;
   if (values.help || values.version || positionals.length === 0) return { values, help: !values.version, version: values.version };
   if (values.timeout !== undefined) requireValue(/^\d+$/.test(values.timeout) && Number(values.timeout) > 0
     && Number(values.timeout) <= 2_147_483_647, 'INVALID_TIMEOUT', '--timeout must be a positive integer below 2147483648.', 2);
-  if (isSemanticObject(positionals[0])) {
-    const request = { ...parseSemanticCommand(positionals), as: values.as, via: values.via, namespace: values.namespace };
+  if (isSemanticObject(positionals[0], vocabulary)) {
+    const request = { ...parseSemanticCommand(positionals, vocabulary), as: values.as, via: values.via, namespace: values.namespace };
     requireValue(values.scenario === undefined || request.scenario === undefined,
       'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
     if (values.scenario !== undefined) request.scenario = values.scenario;
-    const spec = validateSemanticRequest({ ...request, input: values.input }, { routes: Boolean(values.routes) });
+    const spec = validateSemanticRequest({ ...request, input: values.input }, { routes: Boolean(values.routes), vocabulary });
     requireValue(!values.routes || spec.bindable, 'OPTION_NOT_APPLICABLE', '--routes requires a delegated operation.', 2);
     return { values, request };
   }
@@ -158,23 +163,30 @@ async function readInput(value, stdin) {
 export async function runCli(argv, { stdout = process.stdout, stderr = process.stderr, stdin = process.stdin, factory = createSidefx } = {}) {
   let json = argv.includes('--json');
   try {
-    const parsed = parseCommand(argv);
+    const preliminary = parseOptions(argv);
+    const selectedEstate = preliminary.values.estate ?? process.env.SIDEFX_ESTATE;
+    const configuration = preliminary.values.version ? {} : await loadConfiguration(preliminary.values.config, process.cwd(), { estateRoot: selectedEstate });
+    const vocabulary = configuration.commandSurface?.vocabulary;
+    const parsed = parseCommand(argv, vocabulary);
     json = parsed.values.json;
     if (parsed.version) {
       const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
       stdout.write(json ? `${JSON.stringify({ name: 'sfx', version })}\n` : `sfx ${version}\n`);
       return 0;
     }
-    if (parsed.help) { stdout.write(json ? `${JSON.stringify({ command: 'sfx', help })}\n` : help); return 0; }
+    if (parsed.help) {
+      const declared = Object.entries(vocabulary ?? {}).flatMap(([object, operations]) => Object.entries(operations)
+        .filter(([, spec]) => spec.declared).map(([verb, spec]) => `  sfx ${object} ${verb}${spec.query ? ' [query]' : spec.min ? ' <identity>' : ''}`));
+      const content = help + (declared.length ? `\nEstate-declared commands:\n${declared.join('\n')}\n` : '');
+      stdout.write(json ? `${JSON.stringify({ command: 'sfx', help: content })}\n` : content); return 0;
+    }
     const { values, request } = parsed;
     request.input = await readInput(values.input, stdin);
-    const selectedEstate = values.estate ?? process.env.SIDEFX_ESTATE;
-    const configuration = await loadConfiguration(values.config, process.cwd(), { estateRoot: selectedEstate });
     const sidefx = factory({ ...configuration, estateRoot: selectedEstate || configuration.estateRoot, stateRoot: values.state,
       catalogPaths: values.catalog ?? configuration.catalogPaths, routesPath: values.routes,
       timeoutMs: values.timeout === undefined ? undefined : Number(values.timeout) });
     const result = await sidefx.execute(request);
-    stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result)}\n`);
+    stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result, vocabulary)}\n`);
     return 0;
   } catch (error) {
     if (error.code === 'EPIPE') return 0;

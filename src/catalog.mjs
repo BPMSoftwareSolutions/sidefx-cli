@@ -3,8 +3,10 @@ import { readdir, unlink } from 'node:fs/promises';
 import { digest, readJson, writeJson } from './data.mjs';
 import { requireValue, SidefxError } from './errors.mjs';
 
-const providerPattern = /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/;
-export const isProviderId = value => providerPattern.test(value);
+// Typed commands carry opaque estate identities, including qualified names and URNs.
+const providerPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
+export const isProviderId = value => typeof value === 'string' && providerPattern.test(value);
+export const isLegacyProviderId = value => typeof value === 'string' && /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/.test(value);
 export const isCapabilityId = value => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 
 export class ProviderCatalog {
@@ -31,6 +33,7 @@ export class ProviderCatalog {
           providerId: provider.providerId, name: provider.name,
           description: provider.description ?? '', source: provider.source,
           operations: provider.operations, candidateCapabilities: provider.candidateCapabilities,
+          commandBindings: provider.commandBindings ?? [],
           transport: provider.transport ?? null,
           // A catalog is discovery testimony, even when it includes conformance claims.
           evidenceScope: 'DISCOVERY_TESTIMONY', conformanceClaims: provider.conformanceClaims ?? null,

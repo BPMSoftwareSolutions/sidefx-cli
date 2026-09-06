@@ -1,9 +1,10 @@
 {
   "name": "@sidefx/http-provider",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "private": true,
   "description": "Descriptor-driven bounded HTTP operation evaluation provider",
   "engines": { "node": ">=20" },
-  "files": ["worker.mjs", "http.mjs", "credentials.mjs", "capability.json", "runtime.json"]
+  "exports": { ".": "./worker.mjs", "./transport": "./http.mjs", "./credentials": "./credentials.mjs" },
+  "files": ["worker.mjs", "http.mjs", "credentials.mjs", "capability.json"]
 }

@@ -1,4 +1,3 @@
 # Digest-bound artifacts must retain identical bytes across checkout platforms.
 packages/http-provider/*.mjs text eol=lf
 packages/http-provider/*.json text eol=lf
-config/*.json text eol=lf
