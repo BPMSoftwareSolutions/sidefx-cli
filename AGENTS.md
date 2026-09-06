@@ -30,3 +30,13 @@ The entity-neutrality suite must remain part of that command and CI. When changi
 the runtime boundary, also run the relevant estate integration checks; report
 which surfaces and authority were actually exercised. Do not claim enforcement
 in other interfaces merely because this repository's tests pass.
+
+## CLI acceptance
+
+When the user asks to test through `sfx`, execute the `sfx` CLI and retain its
+exact command, exit status and native result. A missing capability binding or
+unresolved provider mechanic is a blocked CLI test. Direct HTTP requests,
+PowerShell probes, SDK calls and fixture proofs do not satisfy that request.
+Report the missing capability explicitly and repair it through the appropriate
+capability boundary; do not substitute a separate client or embed its behavior
+in the CLI. Only provide a command as working after that command has been exercised.

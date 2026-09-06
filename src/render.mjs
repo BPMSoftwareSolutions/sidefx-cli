@@ -41,7 +41,7 @@ function format(request, value) {
     section('Experience', value.experience?.promise ?? '(not declared)'),
     section('Scenarios', list(value.scenarios, scenario => scenario.scenarioId)),
     section('Bound mechanics', mechanicSummary(value.providers)),
-    section('Authority', `${value.capsuleDigest}\n${value.capabilityAuthorityDigest}`),
+    section('Authority', [value.capsuleDigest, value.capabilityAuthorityDigest, value.authorityScope].filter(Boolean).join('\n')),
     'Use sfx capability reveal <capability> --as contracts to inspect canonical input.',
   ].join('\n\n');
   if (request.verb === 'scenarios') return section('Scenarios', list(value.scenarios, item => item.scenarioId));

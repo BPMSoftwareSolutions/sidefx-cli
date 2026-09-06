@@ -1,0 +1,106 @@
+{
+  "catalogType": "sfx-provider-catalog.v1",
+  "providers": [
+    {
+      "providerId": "rapidapi/realty-us",
+      "name": "Realty US",
+      "source": {
+        "kind": "DECLARED",
+        "reference": "https://realty-us.p.rapidapi.com/agents/v2/listings",
+        "description": "Exact operation supplied by the user; credential bytes excluded."
+      },
+      "operations": [
+        "agent-listings"
+      ],
+      "candidateCapabilities": [
+        "evaluate-http-provider"
+      ],
+      "transport": {
+        "protocol": "HTTPS",
+        "method": "GET",
+        "host": "realty-us.p.rapidapi.com"
+      },
+      "conformanceClaims": {
+        "scope": "DECLARED_OPERATION_SMOKE_TEST",
+        "responseCoverage": "JSON_SYNTAX_ONLY_UNLESS_OPERATION_DECLARES_FIELD_CHECKS",
+        "admission": "NOT_CLAIMED"
+      }
+    },
+    {
+      "providerId": "rapidapi/yahoo-finance15",
+      "name": "YH Finance (yahoo-finance15)",
+      "source": {
+        "kind": "DECLARED",
+        "reference": "https://yahoo-finance15.p.rapidapi.com/api/v1/markets/news",
+        "description": "Exact operation supplied by the user; credential bytes excluded."
+      },
+      "operations": [
+        "market-news"
+      ],
+      "candidateCapabilities": [
+        "evaluate-http-provider"
+      ],
+      "transport": {
+        "protocol": "HTTPS",
+        "method": "GET",
+        "host": "yahoo-finance15.p.rapidapi.com"
+      },
+      "conformanceClaims": {
+        "scope": "DECLARED_OPERATION_SMOKE_TEST",
+        "responseCoverage": "JSON_SYNTAX_ONLY_UNLESS_OPERATION_DECLARES_FIELD_CHECKS",
+        "admission": "NOT_CLAIMED"
+      }
+    },
+    {
+      "providerId": "rapidapi/yahoo-finance166",
+      "name": "YFinance API (yahoo-finance166)",
+      "source": {
+        "kind": "DECLARED",
+        "reference": "https://yahoo-finance166.p.rapidapi.com/api/news/list",
+        "description": "Exact operation supplied by the user; credential bytes excluded."
+      },
+      "operations": [
+        "news-list",
+        "stock-price"
+      ],
+      "candidateCapabilities": [
+        "evaluate-http-provider"
+      ],
+      "transport": {
+        "protocol": "HTTPS",
+        "method": "GET",
+        "host": "yahoo-finance166.p.rapidapi.com"
+      },
+      "conformanceClaims": {
+        "scope": "DECLARED_OPERATION_SMOKE_TEST",
+        "responseCoverage": "JSON_SYNTAX_ONLY_UNLESS_OPERATION_DECLARES_FIELD_CHECKS",
+        "admission": "NOT_CLAIMED"
+      }
+    },
+    {
+      "providerId": "rapidapi/yahoo-finance-real-time1",
+      "name": "Yahoo Finance Real Time",
+      "source": {
+        "kind": "DECLARED",
+        "reference": "https://yahoo-finance-real-time1.p.rapidapi.com/stock/get-options",
+        "description": "Exact operation supplied by the user; credential bytes excluded."
+      },
+      "operations": [
+        "stock-options"
+      ],
+      "candidateCapabilities": [
+        "evaluate-http-provider"
+      ],
+      "transport": {
+        "protocol": "HTTPS",
+        "method": "GET",
+        "host": "yahoo-finance-real-time1.p.rapidapi.com"
+      },
+      "conformanceClaims": {
+        "scope": "DECLARED_OPERATION_SMOKE_TEST",
+        "responseCoverage": "JSON_SYNTAX_ONLY_UNLESS_OPERATION_DECLARES_FIELD_CHECKS",
+        "admission": "NOT_CLAIMED"
+      }
+    }
+  ]
+}

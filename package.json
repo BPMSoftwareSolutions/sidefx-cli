@@ -12,10 +12,10 @@
   "engines": { "node": ">=20" },
   "bin": { "sfx": "bin/sfx.mjs" },
   "exports": "./src/index.mjs",
-  "files": ["bin/", "src/", "README.md", "AGENTS.md", "docs/", "examples/"],
+  "files": ["bin/", "src/", "README.md", "AGENTS.md", "docs/", "examples/", "packages/", "config/", "sfx.config.json", "scripts/"],
   "scripts": {
     "start": "node bin/sfx.mjs",
-    "test": "node --test test/cli.test.mjs test/core.test.mjs test/runtime.test.mjs test/neutrality.test.mjs",
+    "test": "node --test test/cli.test.mjs test/core.test.mjs test/runtime.test.mjs test/neutrality.test.mjs test/provider-runtime.test.mjs",
     "test:integration": "node --test integration/estate.test.mjs"
   }
 }

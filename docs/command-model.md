@@ -126,10 +126,26 @@ provider evaluator or admission authority. Missing bindings return
 `capability evaluate ID` remains explicitly scoped to capsule fixtures unless
 delegated. A delivered `PROVIDER_REQUIRED`, rejection or hold keeps its meaning.
 
-Entity-specific values belong in canonical request/configuration data. The CLI
-does not inject the command's provider ID, source, query or namespace into that
-data. The bound capability owns validation of the request and its relationship
-to the selected entity. Inputs are snapshotted before asynchronous route lookup.
+Entity-specific values belong in canonical request/configuration data. Native-input
+capabilities receive the caller's exact input. A capability explicitly declaring
+`sfx-semantic-command.v1` receives `{ contractId, command }`, with the complete
+validated command including optional `input`. Its authority owns the relationship
+between the declared entity and the operation. This is a shared envelope, not an
+instance-specific projection. Requests are snapshotted before asynchronous lookup.
+
+The supplied project configuration binds `provider evaluate` to the separate local
+`evaluate-http-provider` capability. For example:
+
+```text
+sfx provider evaluate rapidapi/yahoo-finance166 --json
+```
+
+That capability accepts the shared command envelope, resolves a declared operation
+and credential reference, and performs one bounded request. It returns the native
+response and declared check results. Its authority scope is
+`LOCAL_INSTALLED_CAPABILITY`, with `managedAdmission: NOT_CLAIMED` and no capsule
+digest. It is inspectable as a capability; `capsule` operations cannot represent
+it as a capsule. Other provider operations still require their own bindings.
 
 The intended managed resolution path is provider identity -> required profile ->
 eligible admitted observation/evaluation provider -> canonical result -> CLI
@@ -174,6 +190,18 @@ and search requests use an object/operation wildcard route. The exact query live
 in the supplied input for the selected capability. Receipts retain route identity,
 the command object and operation, and native result testimony. Routes do not admit
 providers or replace profile eligibility evidence.
+
+`sfx-surface-routes.v3` has the same object/operation/subject matching and closed
+fields, with `authorityDigest` replacing `capsuleDigest`. It binds capability
+meaning without pretending that a local provider owns an estate capsule. The
+runtime manifest independently pins the physical provider and configuration bytes.
+Neither document contains embedded credentials or automatic runtime-selection policy.
+
+`sfx.config.json` supplies catalog paths, default route paths and explicit process
+runtime manifests. Paths resolve relative to the configuration file, including when
+`--config FILE` selects it from elsewhere. Default routes affect matching commands
+only. Explicit CLI routes and catalogs override project defaults. SDK callers use
+`loadConfiguration()` and pass its result to `createSidefx()` for the same bindings.
 
 ## Compatibility and implementation ownership
 

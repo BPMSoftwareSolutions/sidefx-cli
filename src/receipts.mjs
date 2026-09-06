@@ -50,6 +50,8 @@ export class ReceiptStore {
         capsuleDigest: capability.capsuleDigest, capabilityAuthorityDigest: capability.capabilityAuthorityDigest,
         userStory: capability.userStory, experience: capability.experience,
         rootScenarioId: capability.rootScenarioId, providers: capability.providers,
+        ...(capability.runtimeManifestDigest ? { runtimeManifestDigest: capability.runtimeManifestDigest,
+          authorityScope: capability.authorityScope, managedAdmission: capability.managedAdmission } : {}),
       },
       inputDigest: input === undefined ? null : digest(input),
     };
@@ -76,6 +78,7 @@ export class ReceiptStore {
     receipt.resultDigest = digest(execution.result);
     receipt.resultStorage = 'SECRET_FIELDS_REDACTED';
     receipt.executionEstateManifestDigest = execution.estateManifestDigest;
+    if (execution.runtimeManifestDigest) receipt.executionRuntimeManifestDigest = execution.runtimeManifestDigest;
     let saved;
     try { saved = await this.save(receipt); } catch (error) {
       throw new SidefxError('RECEIPT_FINALIZATION_FAILED',

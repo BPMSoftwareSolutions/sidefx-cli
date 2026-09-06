@@ -5,6 +5,7 @@ import { readJson } from './data.mjs';
 import { requireValue, SidefxError, errorRecord } from './errors.mjs';
 import { render } from './render.mjs';
 import { isSemanticObject, parseSemanticCommand, validateSemanticRequest } from './commands.mjs';
+import { loadConfiguration } from './configuration.mjs';
 
 export const help = `SideFX terminal — sfx
 Speak the SideFX capability model: sfx <object> <operation> [identity].
@@ -35,7 +36,7 @@ Entity Neutrality: types select operations; identities and domain values are dat
   sfx evidence inspect|observe|explain <execution-id>
   sfx evidence compare <execution-id> <execution-id>
 
-Managed operations require an explicit capability binding and canonical input:
+Executable operations require an explicit capability binding and canonical input:
   sfx provider discover <source>
   sfx provider evaluate|admit|assimilate|configure|publish <provider>
   sfx capability author|admit|install|publish|govern <capability>
@@ -46,12 +47,15 @@ Managed operations require an explicit capability binding and canonical input:
       --via <capability-id> --input @request.json
   Provider search/inspect, capability resolve/evaluate, capsule evaluate and
   provider/capability/capsule compare can also delegate with --via and --input.
-  Use --routes FILE for object/operation bindings pinned to capsule digests (v2).
+  Use --routes FILE for bindings pinned to capsule digests (v2) or authority (v3).
+  Configured capabilities may accept the complete sfx-semantic-command.v1 envelope.
+  Project defaults apply only to matching routes; provider authority validates input.
 
 Compatibility: existing verb-first forms remain, including sfx invoke, inspect,
   find, search, reveal, evaluate, observe, explain, compare, list and verify.
 
 Options:
+  --config FILE       Project configuration (default: ./sfx.config.json if present)
   --estate PATH       Estate with its installed sda-bootstrap (or SIDEFX_ESTATE)
   --state PATH        Local receipts and provider references (or SIDEFX_HOME)
   --catalog FILE      Provider discovery catalog; repeat for multiple files
@@ -76,7 +80,7 @@ export function parseCommand(argv) {
   let parsed;
   try {
     parsed = parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
-      estate: { type: 'string' }, state: { type: 'string' }, catalog: { type: 'string', multiple: true },
+      config: { type: 'string' }, estate: { type: 'string' }, state: { type: 'string' }, catalog: { type: 'string', multiple: true },
       routes: { type: 'string' }, input: { type: 'string' }, via: { type: 'string' },
       as: { type: 'string' }, scenario: { type: 'string' }, timeout: { type: 'string' },
       namespace: { type: 'string' },
@@ -164,8 +168,9 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     if (parsed.help) { stdout.write(json ? `${JSON.stringify({ command: 'sfx', help })}\n` : help); return 0; }
     const { values, request } = parsed;
     request.input = await readInput(values.input, stdin);
-    const sidefx = factory({ estateRoot: values.estate, stateRoot: values.state,
-      catalogPaths: values.catalog, routesPath: values.routes,
+    const configuration = await loadConfiguration(values.config);
+    const sidefx = factory({ ...configuration, estateRoot: values.estate, stateRoot: values.state,
+      catalogPaths: values.catalog ?? configuration.catalogPaths, routesPath: values.routes,
       timeoutMs: values.timeout === undefined ? undefined : Number(values.timeout) });
     const result = await sidefx.execute(request);
     stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result)}\n`);

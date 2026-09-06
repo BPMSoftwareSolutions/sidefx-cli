@@ -31,6 +31,14 @@ become platform-wide behavior.
 
 ### F1 — P1: execution does not resolve a capability profile to eligible providers
 
+**Local execution follow-up:** the CLI now accepts explicit, digest-bound process
+runtime profiles. A separately packaged HTTP provider owns bounded request
+evaluation, credential resolution and GET/POST mechanics. It declares a required
+profile and its Node implementation rationale; no language is automatically
+selected from capability names. The working estate driver is preserved. This
+closes the missing explicit process connection for locally installed capabilities,
+but does not implement automatic eligibility resolution or confer Harness admission.
+
 [`EstateRuntime.request`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/runtime.mjs#L17) constructs
 `node_modules/sda-bootstrap/src/capsule-manager.mjs` and forks a Node worker.
 [`Sidefx.delegate`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/index.mjs#L54) selects an exact capability ID from

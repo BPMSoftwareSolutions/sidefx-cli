@@ -1,0 +1,12 @@
+{
+  "routesType": "sfx-surface-routes.v3",
+  "routes": [
+    {
+      "object": "provider",
+      "verb": "evaluate",
+      "subject": "*",
+      "capabilityId": "evaluate-http-provider",
+      "authorityDigest": "sha256:9d3ce7d04c87cb5b662aacff8bd6fd06290d2c69fd8e8ec246a344ad1fb263e2"
+    }
+  ]
+}

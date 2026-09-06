@@ -1,5 +1,34 @@
 # Verification — September 6, 2026
 
+## Local provider execution repair
+
+The repair passed 45 CLI/SDK/process tests on Windows. Eight new tests exercise
+the actual CLI against local HTTP servers: cross-namespace evaluation, status/JSON/
+field failures, no redirects or retries, credential and input rejection before
+effects, stale bindings, size/time limits, redaction, receipt failure, local
+capability/capsule distinction and SDK request snapshots.
+
+The estate integration also passed against 219 existing capabilities, including
+runtime parity, CLI/SDK receipt parity and focused fixture proof. An npm archive
+was installed in `.sidefx/provider-package-smoke/installed`; its generated command
+resolved the relocated runtime's artifact digests and four provider descriptors.
+The development `sfx` command was linked to the working repository.
+
+Both live batches used the installed CLI and produced independently retained
+execution receipts. The initial candidates yielded one HTTP 200 and three HTTP
+403 responses. The user's corrected products and operations yielded three HTTP
+200 JSON responses and one HTTP 403 subscription denial. Every invocation made
+one request; all receipts were read back through `sfx execution observe`.
+See the [test report](rapidapi-provider-smoke-test-2026-09-06.md) and
+[current verification summary](evidence/provider-cli-selected-2026-09-06.json).
+
+This proves the configured local provider path, not Harness admission, GET revision
+publication, full native response conformance or provider interchangeability.
+Provider mechanics live in `packages/http-provider`; generic runtime transport
+and local delivery receipts live in `src`.
+
+## Earlier verification history
+
 The command name is `sfx`; the package is now named `sidefx-cli`. The initial
 checks below were performed before the repository/package rename.
 

@@ -5,9 +5,10 @@ The workspace and npm package are named `sidefx-cli`; the terminal command is `s
 
 `sfx` is a capability interface over an existing Managed Capability Estate. The
 current JavaScript/Node implementation is a **candidate interface provider**.
-It reveals capsule-owned meaning and currently delegates execution to the estate's
-installed Node `sda-bootstrap`. That adapter is the present implementation boundary,
-not a rule assigning capabilities to Node.
+It reveals capsule-owned meaning and delegates estate execution to the installed
+`sda-bootstrap`. Explicitly configured local capabilities can also execute through
+a digest-bound process provider. These are separate authority scopes; a local
+provider is never represented as an admitted estate capsule.
 
 **Capability requirements determine the required profile. Eligible admitted
 providers are resolved against constraints and evidence. The selected provider
@@ -39,6 +40,7 @@ and capsule authority, rather than standalone top-level commands.
 
 Requires Node.js 20 or newer. This package has no npm dependencies. The estate
 must have its own pinned runtime installed (`npm ci` in that estate when needed).
+The supplied local HTTP evaluation provider works independently of an estate.
 
 Clone the repository, or open the existing workspace at
 `C:\lab\repos\sidefx-cli`:
@@ -61,6 +63,49 @@ To make `sfx` available on your command path:
 ```text
 npm install --global .
 ```
+
+## Test the configured providers
+
+From `C:\lab\repos\sidefx-cli`, with `sfx` installed:
+
+```powershell
+sfx provider evaluate rapidapi/realty-us --json
+sfx provider evaluate rapidapi/yahoo-finance15 --json
+sfx provider evaluate rapidapi/yahoo-finance166 --json
+sfx provider evaluate rapidapi/yahoo-finance-real-time1 --json
+```
+
+The project configuration selects a separate [HTTP provider package](packages/http-provider/README.md).
+Provider instances are [configuration data](config/http-providers.json), not CLI
+branches. It uses the existing Windows user environment variable `RAPID_API_KEY`;
+the credential is resolved inside the provider. On another OS, configure an
+available credential reference and rebind the local runtime as documented by the package.
+
+The September 6 [CLI test](docs/rapidapi-provider-smoke-test-2026-09-06.md) of the
+user-selected operations returned HTTP 200 with valid JSON for Realty US listings,
+Yahoo Finance15 news and Yahoo Finance166 news. Yahoo Finance Real Time options
+returned HTTP 403 with a missing-subscription message. Each invocation performed
+one request and retained an execution receipt. The configured defaults reproduce
+the supplied fulfillment ID, tickers, snippet count, symbol, language and region.
+
+This is local provider execution, not Harness admission. `PASSED` covers the
+selected operation's declared checks; it does not establish data freshness or
+provider interchangeability. These four operation defaults check HTTP status and
+JSON syntax; they do not declare complete response schemas. CLI exit 0 means delivery completed: inspect
+`result.disposition` for the evaluation result.
+
+From another directory, supply the project configuration explicitly:
+
+```powershell
+sfx provider evaluate rapidapi/yahoo-finance166 --config C:\lab\repos\sidefx-cli\sfx.config.json --json
+```
+
+`sfx.config.json` is loaded from the current directory. Its paths resolve relative
+to that file. Explicit `--catalog` and `--routes` override their project defaults.
+Default routes apply only to matching object/operation/identity keys. Missing
+bindings keep their explicit error; no provider is selected by name heuristics.
+
+## Use an estate
 
 Choose the estate once per shell. PowerShell:
 
@@ -109,8 +154,10 @@ sfx capability resolve provider-selection --via resolve-sidefx-eligible-provider
 ```
 
 Inspect the selected capability's current contracts before preparing its input.
-This command passes the supplied JSON unchanged. The subject is a delivery label;
-it is not inserted into the canonical input or used as policy.
+For native-input capabilities, this command passes supplied JSON unchanged. A
+capability that explicitly declares `sfx-semantic-command.v1` instead receives
+the complete validated command as its canonical input; its authority validates
+the entity relationship. The CLI supplies no provider-specific projection.
 
 ## Execute and inspect evidence
 

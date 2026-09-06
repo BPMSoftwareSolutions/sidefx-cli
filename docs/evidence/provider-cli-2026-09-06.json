@@ -1,0 +1,266 @@
+{
+  "recordType": "sfx-live-provider-verification.v1",
+  "source": "INSTALLED_SFX_CLI",
+  "workingDirectory": "sidefx-cli project root",
+  "authorityScope": "LOCAL_INSTALLED_CAPABILITY",
+  "managedAdmissionClaimed": false,
+  "rawResponseBodyRetained": false,
+  "observations": [
+    {
+      "command": "sfx provider evaluate rapidapi/yahoo-finance166 --json",
+      "executionId": "exec-6404c777-defe-4094-8a8b-dc9a9fafe8a0",
+      "receiptDigest": "sha256:a127d4cd3dad50915274e1850290f747c6058a9f66e715f9166a1a5d3b85a148",
+      "capability": {
+        "capabilityId": "evaluate-http-provider",
+        "capabilityVersion": "0.1.0",
+        "capsuleDigest": null,
+        "capabilityAuthorityDigest": "sha256:9d3ce7d04c87cb5b662aacff8bd6fd06290d2c69fd8e8ec246a344ad1fb263e2",
+        "userStory": {
+          "actor": "provider consumer",
+          "intent": "Test a selected provider operation through its declared request and response checks",
+          "outcome": "One bounded exchange yields attributable response or rejection evidence"
+        },
+        "experience": {
+          "promise": "Validate inputs and resolve a credential reference, perform one bounded HTTP exchange, preserve rejection testimony, and check declared response fields without implying admission or provider equivalence"
+        },
+        "rootScenarioId": "evaluate-declared-http-operation",
+        "providers": [
+          {
+            "bindingId": "evaluate-http-provider",
+            "providerCapabilityId": "sidefx/bounded-http",
+            "providerProfileId": "bounded-http-operation.v1",
+            "runtimeFamily": "node"
+          }
+        ],
+        "runtimeManifestDigest": "sha256:e062fa39e68d0f96a15c9f4953f3fefeeb62bbc4fe25cf2e4bab6c64361e2163",
+        "authorityScope": "LOCAL_INSTALLED_CAPABILITY",
+        "managedAdmission": "NOT_CLAIMED"
+      },
+      "inputDigest": "sha256:d0f28e2f65462c321f4a51e651181dad6e1ae8d266de70e0a97920fcb8eb97f7",
+      "startedAt": "2026-09-06T21:32:22.29Z",
+      "resultDigest": "sha256:e7e34686548f9b84083e41489e90a414bb62d2fca1ea2592d5f90b94a8a2887c",
+      "disposition": "PASSED",
+      "observation": {
+        "transportDisposition": "HTTP_RESPONSE_OBSERVED",
+        "httpStatus": 200,
+        "contentType": "application/json; charset=utf-8",
+        "bodyBytes": 1673,
+        "responseBodyDigest": "sha256:438f352fa9affacd9569bff405710b8921c1ce1f2a47cb6a828f6ed42467d20f",
+        "startedAt": "2026-09-06T21:32:22.381Z",
+        "completedAt": "2026-09-06T21:32:22.715Z",
+        "durationMilliseconds": 333,
+        "attemptCount": 1,
+        "retryCount": 0,
+        "redirectsFollowed": 0,
+        "maximumResponseBytes": 262144,
+        "timeoutMilliseconds": 12000
+      },
+      "validation": {
+        "expectedStatus": [
+          200
+        ],
+        "statusPassed": true,
+        "jsonValid": true,
+        "checks": [
+          {
+            "pointer": "/quoteSummary/result/0/price/symbol",
+            "expectedType": "string",
+            "passed": true
+          },
+          {
+            "pointer": "/quoteSummary/result/0/price/currency",
+            "expectedType": "string",
+            "passed": true
+          },
+          {
+            "pointer": "/quoteSummary/result/0/price/regularMarketPrice/raw",
+            "expectedType": "number",
+            "passed": true
+          }
+        ],
+        "responseCoverage": "DECLARED_FIELDS_ONLY"
+      },
+      "gatewayMessage": null
+    },
+    {
+      "command": "sfx provider evaluate rapidapi/yh-finance --json",
+      "executionId": "exec-87c7d9b6-a5ec-4ca6-a8d0-7cc63329353f",
+      "receiptDigest": "sha256:15adadc8c34d26fcd2991be0e214f21434e3698cf4c8fffdcd4afb9f474e5fcc",
+      "capability": {
+        "capabilityId": "evaluate-http-provider",
+        "capabilityVersion": "0.1.0",
+        "capsuleDigest": null,
+        "capabilityAuthorityDigest": "sha256:9d3ce7d04c87cb5b662aacff8bd6fd06290d2c69fd8e8ec246a344ad1fb263e2",
+        "userStory": {
+          "actor": "provider consumer",
+          "intent": "Test a selected provider operation through its declared request and response checks",
+          "outcome": "One bounded exchange yields attributable response or rejection evidence"
+        },
+        "experience": {
+          "promise": "Validate inputs and resolve a credential reference, perform one bounded HTTP exchange, preserve rejection testimony, and check declared response fields without implying admission or provider equivalence"
+        },
+        "rootScenarioId": "evaluate-declared-http-operation",
+        "providers": [
+          {
+            "bindingId": "evaluate-http-provider",
+            "providerCapabilityId": "sidefx/bounded-http",
+            "providerProfileId": "bounded-http-operation.v1",
+            "runtimeFamily": "node"
+          }
+        ],
+        "runtimeManifestDigest": "sha256:e062fa39e68d0f96a15c9f4953f3fefeeb62bbc4fe25cf2e4bab6c64361e2163",
+        "authorityScope": "LOCAL_INSTALLED_CAPABILITY",
+        "managedAdmission": "NOT_CLAIMED"
+      },
+      "inputDigest": "sha256:826bbd7f6ce2fe4cc7412c961c9b4028a5a262c798b618645db4c28fb6aff096",
+      "startedAt": "2026-09-06T21:32:39.7Z",
+      "resultDigest": "sha256:969ada7b117a81fb26811af5a37b64fa9b14507daaa9796ddc6d4ffb3262f1dc",
+      "disposition": "HTTP_REJECTED",
+      "observation": {
+        "transportDisposition": "HTTP_RESPONSE_OBSERVED",
+        "httpStatus": 403,
+        "contentType": "application/json",
+        "bodyBytes": 49,
+        "responseBodyDigest": "sha256:f4357711297d49806a2dd71fb021bad8a16d65c2a9f6d1c7b0da172ba1a9ac98",
+        "startedAt": "2026-09-06T21:32:39.788Z",
+        "completedAt": "2026-09-06T21:32:40.159Z",
+        "durationMilliseconds": 369,
+        "attemptCount": 1,
+        "retryCount": 0,
+        "redirectsFollowed": 0,
+        "maximumResponseBytes": 262144,
+        "timeoutMilliseconds": 12000
+      },
+      "validation": {
+        "expectedStatus": [
+          200
+        ],
+        "statusPassed": false,
+        "jsonValid": true,
+        "checks": [],
+        "responseCoverage": "JSON_SYNTAX_ONLY"
+      },
+      "gatewayMessage": "You are not subscribed to this API."
+    },
+    {
+      "command": "sfx provider evaluate rapidapi/seeking-alpha --json",
+      "executionId": "exec-d378f2b4-fdc3-460b-b07e-a8ebbced622b",
+      "receiptDigest": "sha256:cc9888f1498348b9f3aa27a0734863b006e8c41a373a3ffeaca5fe482aeddbcc",
+      "capability": {
+        "capabilityId": "evaluate-http-provider",
+        "capabilityVersion": "0.1.0",
+        "capsuleDigest": null,
+        "capabilityAuthorityDigest": "sha256:9d3ce7d04c87cb5b662aacff8bd6fd06290d2c69fd8e8ec246a344ad1fb263e2",
+        "userStory": {
+          "actor": "provider consumer",
+          "intent": "Test a selected provider operation through its declared request and response checks",
+          "outcome": "One bounded exchange yields attributable response or rejection evidence"
+        },
+        "experience": {
+          "promise": "Validate inputs and resolve a credential reference, perform one bounded HTTP exchange, preserve rejection testimony, and check declared response fields without implying admission or provider equivalence"
+        },
+        "rootScenarioId": "evaluate-declared-http-operation",
+        "providers": [
+          {
+            "bindingId": "evaluate-http-provider",
+            "providerCapabilityId": "sidefx/bounded-http",
+            "providerProfileId": "bounded-http-operation.v1",
+            "runtimeFamily": "node"
+          }
+        ],
+        "runtimeManifestDigest": "sha256:e062fa39e68d0f96a15c9f4953f3fefeeb62bbc4fe25cf2e4bab6c64361e2163",
+        "authorityScope": "LOCAL_INSTALLED_CAPABILITY",
+        "managedAdmission": "NOT_CLAIMED"
+      },
+      "inputDigest": "sha256:3dd5e5c808dc87eb831e12b653d3ff091c294cf407c574f83af82378cd2e876f",
+      "startedAt": "2026-09-06T21:32:40.273Z",
+      "resultDigest": "sha256:90cf5e9a86d9da1db05b1f879c9c7d332043417d7ea8a56424d41ed88e3bc28d",
+      "disposition": "HTTP_REJECTED",
+      "observation": {
+        "transportDisposition": "HTTP_RESPONSE_OBSERVED",
+        "httpStatus": 403,
+        "contentType": "application/json",
+        "bodyBytes": 49,
+        "responseBodyDigest": "sha256:f4357711297d49806a2dd71fb021bad8a16d65c2a9f6d1c7b0da172ba1a9ac98",
+        "startedAt": "2026-09-06T21:32:40.376Z",
+        "completedAt": "2026-09-06T21:32:40.777Z",
+        "durationMilliseconds": 401,
+        "attemptCount": 1,
+        "retryCount": 0,
+        "redirectsFollowed": 0,
+        "maximumResponseBytes": 262144,
+        "timeoutMilliseconds": 12000
+      },
+      "validation": {
+        "expectedStatus": [
+          200
+        ],
+        "statusPassed": false,
+        "jsonValid": true,
+        "checks": [],
+        "responseCoverage": "JSON_SYNTAX_ONLY"
+      },
+      "gatewayMessage": "You are not subscribed to this API."
+    },
+    {
+      "command": "sfx provider evaluate rapidapi/realty-in-us --json",
+      "executionId": "exec-6617fcdf-0c16-4980-a055-4acf7bd11476",
+      "receiptDigest": "sha256:6819e0fad88273e0d83afdb8f0cb1119d82ee6d96178159bec618f2580c23164",
+      "capability": {
+        "capabilityId": "evaluate-http-provider",
+        "capabilityVersion": "0.1.0",
+        "capsuleDigest": null,
+        "capabilityAuthorityDigest": "sha256:9d3ce7d04c87cb5b662aacff8bd6fd06290d2c69fd8e8ec246a344ad1fb263e2",
+        "userStory": {
+          "actor": "provider consumer",
+          "intent": "Test a selected provider operation through its declared request and response checks",
+          "outcome": "One bounded exchange yields attributable response or rejection evidence"
+        },
+        "experience": {
+          "promise": "Validate inputs and resolve a credential reference, perform one bounded HTTP exchange, preserve rejection testimony, and check declared response fields without implying admission or provider equivalence"
+        },
+        "rootScenarioId": "evaluate-declared-http-operation",
+        "providers": [
+          {
+            "bindingId": "evaluate-http-provider",
+            "providerCapabilityId": "sidefx/bounded-http",
+            "providerProfileId": "bounded-http-operation.v1",
+            "runtimeFamily": "node"
+          }
+        ],
+        "runtimeManifestDigest": "sha256:e062fa39e68d0f96a15c9f4953f3fefeeb62bbc4fe25cf2e4bab6c64361e2163",
+        "authorityScope": "LOCAL_INSTALLED_CAPABILITY",
+        "managedAdmission": "NOT_CLAIMED"
+      },
+      "inputDigest": "sha256:1f6f1cba490d78a905ad85c234d8880d76743d9162e361009bec940b42d54ff0",
+      "startedAt": "2026-09-06T21:32:40.859Z",
+      "resultDigest": "sha256:f52d05ca0809d96dcbf5d9ab9ee0a143dae0c1eaccfa24a7c1b25a565072c528",
+      "disposition": "HTTP_REJECTED",
+      "observation": {
+        "transportDisposition": "HTTP_RESPONSE_OBSERVED",
+        "httpStatus": 403,
+        "contentType": "application/json",
+        "bodyBytes": 49,
+        "responseBodyDigest": "sha256:f4357711297d49806a2dd71fb021bad8a16d65c2a9f6d1c7b0da172ba1a9ac98",
+        "startedAt": "2026-09-06T21:32:40.947Z",
+        "completedAt": "2026-09-06T21:32:41.321Z",
+        "durationMilliseconds": 373,
+        "attemptCount": 1,
+        "retryCount": 0,
+        "redirectsFollowed": 0,
+        "maximumResponseBytes": 262144,
+        "timeoutMilliseconds": 12000
+      },
+      "validation": {
+        "expectedStatus": [
+          200
+        ],
+        "statusPassed": false,
+        "jsonValid": true,
+        "checks": [],
+        "responseCoverage": "JSON_SYNTAX_ONLY"
+      },
+      "gatewayMessage": "You are not subscribed to this API."
+    }
+  ]
+}

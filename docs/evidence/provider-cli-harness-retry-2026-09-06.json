@@ -1,0 +1,20 @@
+{
+  "observationType": "sfx-harness-provider-retry.v1",
+  "observedAt": "2026-09-06T21:54:12.6251423Z",
+  "workingDirectory": "C:\\lab\\repos\\agentic-harness",
+  "command": "sfx provider evaluate rapidapi/yahoo-finance166 --estate C:\\lab\\repos\\agentic-harness --json",
+  "executable": "C:\\nvm4w\\nodejs\\sfx.cmd",
+  "exitCode": 3,
+  "nativeResult": {
+    "error": {
+      "code": "CAPABILITY_ROUTE_REQUIRED",
+      "message": "evaluate requires an explicit capability binding. Use --via CAPABILITY --input @request.json, or --routes FILE."
+    }
+  },
+  "estateCommit": "3323d82d5255e3d78fd76c312b7f1d416620caa0",
+  "originMainCommit": "3323d82d5255e3d78fd76c312b7f1d416620caa0",
+  "disposition": "BLOCKED_BEFORE_PROVIDER_EXECUTION",
+  "networkExchangePerformed": false,
+  "subscriptionRetested": false,
+  "localProviderPackageUsed": false
+}

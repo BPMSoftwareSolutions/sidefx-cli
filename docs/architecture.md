@@ -29,12 +29,27 @@ sfx argv / canonical JSON
 
 ## Ownership
 
-This implementation currently contains command parsing, process transport,
-representation and local delivery receipts. Their location in this repository
-does not make it the authority for those responsibilities. It consumes the estate
-chosen by the caller. It does not
-modify the Harness, copy its runtime, evaluate its semantic expressions, create
-provider bindings, or implement a second managed lifecycle.
+The CLI/SDK contains command parsing, process transport, representation and local
+delivery receipts. The separately packaged `packages/http-provider` implementation
+owns its capability's request admission, credential resolution, HTTP effects and
+declared response evaluation. Project configuration explicitly binds it as a local
+installed provider. It does not modify the Harness, copy its runtime, evaluate its
+semantic expressions or implement another managed lifecycle.
+
+Local process capabilities carry a `sfx-capability-representation.v1` authority
+document and `sfx-process-runtime.v1` physical binding. Their authority and runtime
+digests are retained independently. A v3 route pins the capability authority; the
+runtime manifest pins the worker and its configuration. Changes fail before
+execution until the reviewed binding is updated. These local pins confer no
+Harness admission or publication, and are not signatures. Such a capability has
+no capsule digest and is never projected as an estate capsule.
+
+The generic process driver passes one JSON request on stdin and expects one JSON
+response on stdout, with bounded output and a timeout. It uses no shell, drains
+diagnostics separately, and preserves the provider's result. Node is the selected
+HTTP implementation because these are deterministic HTTP/JSON mechanics; the
+protocol permits an explicitly configured executable from another runtime family.
+Automatic eligibility ranking remains a separate capability responsibility.
 
 The adapter imports the selected estate's installed `sda-bootstrap` exports:
 `loadEstate`, `verifyEstate`, `listCapsules`, `inspectCapsule`, `resolveEstate`,
@@ -100,10 +115,11 @@ entities even though they have no standalone top-level commands in this adapter.
 
 Live discovery, WeatherAPI invocation, provider assimilation, provider selection
 policy, remote distribution, and enterprise publication need the corresponding
-admitted provider/capability authority and input. This implementation does not
-claim those domain systems are complete. In particular, the Harness's current
-RapidAPI demonstration documents open event-mechanic slots and
-`PROVIDER_REQUIRED`; a shell alias cannot close them.
+provider/capability authority and input. The local HTTP provider now supplies
+bounded evaluation for four configured RapidAPI operations, verified through
+`sfx provider evaluate`. It makes no complete-schema, freshness, interchangeability,
+admission or publication claim. The Harness's separate RapidAPI tokens retain
+their open event-mechanic slots; this local provider does not close those slots.
 
 The content-creation workspace informed the evidence and teaching model. It is
 not a runtime dependency. No frozen corpus or example provider is imported as
