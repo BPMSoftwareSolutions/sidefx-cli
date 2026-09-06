@@ -8,7 +8,7 @@ const query = { query: true, max: Infinity };
 const bindable = { bindable: true };
 const comparison = local('compare', 2, bindable);
 
-// This vocabulary describes SideFX objects. Supplier identities never select syntax.
+// Entity types select syntax and adapters. Instance identities and domain data do not.
 const vocabulary = {
   provider: {
     list: local('providers', 0), search: local('provider-search', 0, { ...query, ...bindable }),
@@ -49,9 +49,12 @@ const vocabulary = {
   },
 };
 
-export const isSemanticObject = object => Object.hasOwn(vocabulary, object);
+const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'via', 'input', 'namespace']);
+
+export const isSemanticObject = object => typeof object === 'string' && Object.hasOwn(vocabulary, object);
 export function semanticCommand(object, verb) {
-  return isSemanticObject(object) && Object.hasOwn(vocabulary[object], verb) ? vocabulary[object][verb] : null;
+  return isSemanticObject(object) && typeof verb === 'string' && Object.hasOwn(vocabulary[object], verb)
+    ? vocabulary[object][verb] : null;
 }
 
 export function parseSemanticCommand([object, verb, ...operands]) {
@@ -65,6 +68,8 @@ export function parseSemanticCommand([object, verb, ...operands]) {
 }
 
 export function validateSemanticRequest(request, { routes = false } = {}) {
+  requireValue(Reflect.ownKeys(request).every(field => requestFields.has(field)), 'REQUEST_FIELD_REJECTED',
+    'Use the canonical command fields; entity-specific data belongs inside input.', 2);
   const { object, verb, subject, other } = request;
   const spec = semanticCommand(object, verb);
   requireValue(spec, 'COMMAND_REJECTED', `Unknown ${object} operation ${verb}. Run sfx --help.`, 2);
@@ -101,16 +106,16 @@ export function validateSemanticRequest(request, { routes = false } = {}) {
   return spec;
 }
 
-// Reuse existing mechanics; this projection does not interpret provider behavior.
+// Reuse existing mechanics; the caller retains the declared entity type for dispatch.
 export function projectSemanticRequest(request) {
   const spec = semanticCommand(request.object, request.verb);
   if (!spec?.projection) return request;
-  const projected = { ...request, object: undefined, localOnly: true };
+  const projected = { ...request, object: undefined };
   switch (spec.projection) {
     case 'providers': return { ...projected, verb: 'list', subject: 'providers' };
     case 'capabilities': return { ...projected, verb: 'list', subject: 'capabilities' };
     case 'executions': return { ...projected, verb: 'list', subject: 'executions' };
-    case 'provider-search': return { ...projected, verb: 'search', collection: 'providers', subject: request.namespace ?? null };
+    case 'provider-search': return { ...projected, verb: 'search', subject: request.namespace ?? null };
     case 'capability-search': return { ...projected, verb: 'find', subject: request.query };
     case 'reference': return { ...projected, verb: 'provider', action: request.verb };
     case 'providers-for-capability': return { ...projected, verb: 'providers' };

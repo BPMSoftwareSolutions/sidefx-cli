@@ -16,10 +16,11 @@ may satisfy different profiles. The current CLI does not yet implement that
 general provider-resolution circuit. Its shared SDK is a useful integration seam.
 See the [responsibility and runtime review](docs/responsibility-runtime-review.md).
 
-**Provider Neutrality Law:** no provider, vendor, ecosystem, transport, language,
-or implementation technology introduces a top-level command or changes the
-canonical grammar to expose its own mechanics. `sfx` speaks the SideFX capability
-model; providers supply data and mechanics behind it.
+**Entity Neutrality Law:** no entity instance, business domain, provider or
+implementation technology introduces special interface syntax. Entity-specific
+meaning and behavior resolve through canonical SideFX authority. This applies to
+capabilities, scenarios, inputs, events, outcomes, providers and every other entity.
+Provider Neutrality is one case of this broader law.
 
 ```text
 sfx <object> <operation> [identity]
@@ -28,6 +29,11 @@ sfx <object> <operation> [identity]
 The objects are `provider`, `capability`, `scenario`, `capsule`, `execution`,
 `estate`, `profile`, and `evidence`. The [command model](docs/command-model.md)
 defines supported operations, current evidence scopes, delegation and compatibility.
+Entity types define supported operations; identities select instances; authority
+defines meaning and contracts; eligible providers supply execution mechanics.
+The declared type survives dispatch even when an ID resembles another entity kind.
+Inputs, events and outcomes are currently exposed through their containing scenario
+and capsule authority, rather than standalone top-level commands.
 
 ## Run it
 

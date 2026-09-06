@@ -9,6 +9,7 @@ import { projectCapability, revealCapability, structuralDiff } from '../src/proj
 import { ReceiptStore } from '../src/receipts.mjs';
 import { ProviderCatalog } from '../src/catalog.mjs';
 import { temporary, fakeRuntime, capsuleFixture } from './helpers.mjs';
+import { render } from '../src/render.mjs';
 
 test('scenario and blueprint views retain capsule authority and exact geometry', () => {
   const capability = projectCapability(capsuleFixture());
@@ -283,6 +284,17 @@ test('v3 scenario views bind exact feature identities and preserve native cells'
   assert.equal(view.scenarios[0].event.eventId, 'observation-requested');
   assert.equal(view.scenarios[0].outcome.terminal, true);
   assert.equal(view.providers[0].nativeBinding.slotId, 'slot:observe');
+  assert.equal(view.providers[0].mechanicId, 'observe.v1');
+  assert.equal(view.providers[0].providerProfileId, 'node:observe');
+  assert.equal(view.providers[0].providerCapabilityId, null);
+  assert.equal(view.providers[0].provider, null);
+  const rendered = render({ object: 'capability', verb: 'inspect', subject: 'observe-example' }, view);
+  assert.match(rendered, /mechanic observe\.v1/);
+  assert.match(rendered, /profile node:observe/);
+  assert.doesNotMatch(rendered, /provider capability observe\.v1/);
+  plan.realizationOverlay.providerBindings[0].providerCapabilityId = 'observe-through-provider';
+  fixture.capsule.entries.find(entry => entry.entryId === 'plan').entryBytesBase64 = Buffer.from(JSON.stringify(plan)).toString('base64');
+  assert.equal(projectCapability(fixture).providers[0].providerCapabilityId, 'observe-through-provider');
   assert.equal(view.contracts['example.v1'].schema.type, 'object');
   assert.throws(() => projectCapability({ ...fixture, featureDocument: null }), /No capsule feature identity/);
 });

@@ -69,3 +69,30 @@ describe the repository-name transfer, not the later grammar work.
 The new grammar does not supply live provider credentials, evaluator mechanics,
 admission decisions or automatic profile-based provider resolution. The live test
 invoked only the existing read-only estate resolver and its focused fixtures.
+
+## Entity-neutrality reinforcement
+
+Review of the provider-neutral baseline (`941b205`) found that canonical comparison
+could reclassify a capability ID as an execution receipt ID, SDK commands silently
+accepted undeclared fields, and v2 routes accepted undeclared configuration. The
+new regression suite reproduced those three gaps before the fixes.
+
+| Check | Observed result |
+| --- | --- |
+| Portable unit/process suite | All 37 tests passed, including six entity-neutrality tests now included in `npm test` and the existing CI command |
+| Typed identity collision | Capability/capsule reads stay on capsule authority when the same ID also names an execution receipt; unavailable authority does not fall back across entity kinds |
+| Shared command envelope | Undeclared SDK control fields rejected before runtime calls; the same fields inside canonical input are forwarded unchanged |
+| Entity relationships | Exact scenario, input, event and outcome identities retained across unrelated domains; an unobserved scenario remains unavailable |
+| Binding scope | Provider, capability, capsule and profile evaluation routes remain isolated by object and operation; v2 documents and entries reject undeclared fields |
+| Receipt context | Typed invocation and fixture evidence retain their declared object and operation |
+| Live integration | Passed against 219 estate capabilities after dispatch/context changes; canonical runtime and CLI/SDK receipt parity retained |
+| V3 identity roles | After the projection correction, all 87 bindings in live `admit-capability-authority` matched their native mechanic/profile/provider identity fields; terminal role labels verified |
+
+The broader law is recorded in the command model, README, architecture, intent
+correction and root `AGENTS.md`. The npm package includes those contribution rules.
+V3 callers must read mechanic/profile identities from `mechanicId` and
+`providerProfileId`; absent actual provider identities are now `null`.
+
+The enforcement observed here covers this CLI and its shared SDK. Inputs, events
+and outcomes retain their existing capsule/scenario representation; standalone
+command families and conformance of other SideFX delivery surfaces are not claimed.

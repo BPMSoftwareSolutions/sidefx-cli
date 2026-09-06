@@ -1,10 +1,11 @@
 "..\..\agentic-harness"
 "..\..\content-creation-mission"
 
-> Adopted correction: the [Provider Neutrality Law and command model](command-model.md)
+> Adopted correction: the [Entity Neutrality Law and command model](command-model.md)
 > define the current object-first grammar: `sfx <object> <operation> [identity]`.
-> Provider names are data, and provider-specific mechanics resolve behind capability
-> contracts. The original intent below is retained as design history; its verb-first
+> Every entity's identity is data; canonical authority defines its meaning and contracts.
+> Provider Neutrality is one case of this rule. The original intent below is retained
+> as design history; its verb-first
 > examples are compatibility forms, not authority for vendor-specific commands.
 
 Yes — and I think the CLI becomes **far more important than “SideFX also has a command line.”** It should become the **lowest-friction engineering surface over the Managed Capability Estate**.

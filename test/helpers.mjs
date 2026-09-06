@@ -9,15 +9,16 @@ export async function temporary(t) {
   return root;
 }
 
-export function capsuleFixture(id = 'observe-example') {
+export function capsuleFixture(id = 'observe-example', { scenarioId = id, inputId = 'example-input',
+  eventId = 'example-requested', outcomeId = 'example-outcome' } = {}) {
   const encode = (entryId, value, entryRef = entryId) => {
     const bytes = Buffer.from(JSON.stringify(value));
     return { entryId, entryRef, entryDigest: bytesDigest(bytes), entryBytesBase64: bytes.toString('base64') };
   };
-  const scenario = { scenarioId: id, input: { inputId: 'example-input', contract: { contractId: 'example.v1' } },
-    event: { eventId: 'example-requested' }, outcome: { outcomeId: 'example-outcome', terminal: true } };
+  const scenario = { scenarioId, input: { inputId, contract: { contractId: 'example.v1' } },
+    event: { eventId }, outcome: { outcomeId, terminal: true } };
   const entries = [
-    encode('capability.authority.json', { capabilityId: id, name: 'Observe Example', rootScenarioId: id,
+    encode('capability.authority.json', { capabilityId: id, name: 'Observe Example', rootScenarioId: scenarioId,
       userStory: { intent: 'Observe an example.' }, experience: { promise: 'An example is observable.' } }),
     encode('blueprint.authority.json', { nodes: [{ nodeId: id }], sourceAuthority: { disposition: 'ADMITTED' } }),
     encode('plan', { executionEmbodimentPlanType: 'consumer-execution-embodiment-plan.v2', rootNodeId: id,

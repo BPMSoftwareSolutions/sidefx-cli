@@ -3,10 +3,13 @@
 The updated [intent](intent.md) establishes `sfx` as the terminal command name.
 SideFX remains the product and capability namespace.
 
-The adopted [Provider Neutrality Law and command model](command-model.md) make
+The adopted [Entity Neutrality Law and command model](command-model.md) make
 `sfx <object> <operation> [identity]` canonical. The shared CLI/SDK command model
 validates semantic object/operation pairs and projects supported local operations
-onto existing mechanics. Provider identities and namespace filters are data.
+onto existing mechanics. Every entity identity and domain value is data; Provider
+Neutrality is one case of the broader invariant. The declared type is retained
+through dispatch and execution testimony. Typed reads never select another entity
+kind merely because an identifier resembles a provider reference or receipt ID.
 
 Repository and package: `sidefx-cli`. This document describes the current Node
 candidate implementation. It does not assign semantic capability ownership to
@@ -54,6 +57,11 @@ and Given/When/Then names come from the capsule's feature, parsed by the runtime
 installed Gherkin parser. Canonical cell and provider binding records remain
 available in JSON, with source digests. Unknown geometry fails explicitly.
 
+V3 bindings expose mechanic, provider-profile and provider-capability identities
+as separate fields. Unobserved identities stay `null`; native bindings are retained.
+Human summaries label the distinct roles instead of treating a mechanic name as
+evidence that a provider capability was selected.
+
 Blueprint views return the complete capsule-owned blueprint. They do not generate
 a diagram and label it admitted. Contract views return the plan's contract
 authorities, including their schema identities and digests. Structural comparison
@@ -83,6 +91,12 @@ subject matching and wildcard fallback stay within the same object/operation.
 Legacy verb-first requests retain v1 routes. Binding configuration and argument
 normalization do not establish provider eligibility or admission. Local profile
 inference and supplier-specific command branches are absent.
+
+Canonical SDK requests and v2 route entries reject undeclared control fields.
+Entity-specific values travel inside canonical input/configuration and are validated
+by the selected authority. Scenario views retain input, event and outcome identities
+without deriving business behavior from their names. These are capsule-owned
+entities even though they have no standalone top-level commands in this adapter.
 
 Live discovery, WeatherAPI invocation, provider assimilation, provider selection
 policy, remote distribution, and enterprise publication need the corresponding
@@ -130,4 +144,7 @@ discovery provenance and fixture-proof labeling. Live tests exercise all three
 plan generations, compare a real resolver invocation with direct bootstrap
 execution (observation timestamps belong to their separate executions), compare
 CLI and SDK observation of the same receipt, and run focused provider-resolution
-fixtures. The operating-system CI matrix does not imply it has run locally.
+fixtures. The entity-neutrality suite checks typed identifier collisions, rejection
+of undeclared command/route fields, scoped route resolution, and exact preservation
+of scenario/input/event/outcome authority. The operating-system CI matrix does not
+imply it has run locally or that other delivery surfaces have been qualified.

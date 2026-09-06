@@ -58,8 +58,10 @@ export function projectCapability({ inspection, capsule, featureDocument }) {
     ?? Object.assign({}, ...mechanics.map(binding => binding.configuration?.contractAuthorities?.contracts ?? {}));
   const providers = graph
     ? (plan.value.realizationOverlay?.providerBindings ?? []).map(binding => ({
-      bindingId: binding.slotId, mechanicType: 'graph-provider', providerCapabilityId: binding.mechanicId,
-      provider: binding.providerProfileId, nativeBinding: binding,
+      bindingId: binding.slotId, mechanicType: 'graph-provider',
+      mechanicId: binding.mechanicId ?? null, providerProfileId: binding.providerProfileId ?? null,
+      providerCapabilityId: binding.providerCapabilityId ?? null, provider: binding.provider ?? null,
+      nativeBinding: binding,
     }))
     : mechanics.map(({ bindingId, mechanicType, providerCapabilityId, provider }) => ({
       bindingId, mechanicType, providerCapabilityId: providerCapabilityId ?? null, provider: provider ?? null,

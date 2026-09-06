@@ -1,10 +1,28 @@
 # SideFX command model
 
-## Provider Neutrality Law
+## Entity Neutrality Law
 
-No provider, vendor, ecosystem, transport, language, or implementation technology
-may introduce a top-level `sfx` command or alter the canonical CLI grammar merely
-to expose provider-specific mechanics.
+No entity instance, business domain, provider, or implementation technology may
+introduce special interface syntax. Entity-specific meaning and behavior resolve
+through canonical SideFX authority.
+
+The law covers capabilities, scenarios, inputs, events, outcomes, providers,
+capsules, executions, estates, profiles, evidence, and future entity types.
+Provider Neutrality is its provider-specific case. The invariant applies to CLI,
+SDK, API, MCP and UI projections of the architecture.
+
+| Concern | Authority |
+| --- | --- |
+| Supported operations and relationships | Entity type and its shared contracts |
+| Selected instance | Canonical identity, including its containing authority where required |
+| Meaning, input/event/outcome contracts and constraints | Exact selected canonical authority |
+| Physical execution | Eligible provider selected against required profiles and evidence |
+| Display and transport | Interface projection preserving identity, scope and testimony |
+
+Neutrality preserves type distinctions. A capability and an execution may have
+the same textual identifier without becoming interchangeable. Entity-specific
+contracts still govern valid input and outcomes; neutrality does not mean every
+object supports every operation or that arbitrary entity types can execute.
 
 `sfx` speaks the SideFX capability model. Providers supply data and mechanics
 behind that model. The canonical shape is:
@@ -16,6 +34,17 @@ sfx <object> <operation> [identity]
 The vocabulary is `provider`, `capability`, `scenario`, `capsule`, `execution`,
 `estate`, `profile`, and `evidence`. Supported pairs are explicit; the vocabulary
 does not imply that every object supports every operation.
+
+Inputs, events and outcomes are presently represented within capsule-owned
+scenario views and contracts. Their identities and relationships are retained as
+authority data. They do not yet have standalone command families. Unsupported
+entity/operation pairs fail explicitly instead of inventing local mechanics.
+
+## Provider Neutrality Law
+
+As a consequence of Entity Neutrality, no provider, vendor, ecosystem, transport,
+language or implementation technology adds commands or flags to expose its own
+mechanics. Provider-specific values remain canonical data/configuration.
 
 These use the same parser, descriptor contract and rendering:
 
@@ -97,10 +126,10 @@ provider evaluator or admission authority. Missing bindings return
 `capability evaluate ID` remains explicitly scoped to capsule fixtures unless
 delegated. A delivered `PROVIDER_REQUIRED`, rejection or hold keeps its meaning.
 
-Provider-specific values belong in canonical request/configuration data. The CLI
+Entity-specific values belong in canonical request/configuration data. The CLI
 does not inject the command's provider ID, source, query or namespace into that
 data. The bound capability owns validation of the request and its relationship
-to the provider. Inputs are snapshotted before asynchronous route lookup.
+to the selected entity. Inputs are snapshotted before asynchronous route lookup.
 
 The intended managed resolution path is provider identity -> required profile ->
 eligible admitted observation/evaluation provider -> canonical result -> CLI
@@ -134,6 +163,11 @@ This is a template; replace the capability and digest placeholders before use:
 sfx provider evaluate <provider> --routes routes.json --input @evaluation.json
 ```
 
+v2 documents accept only `routesType` and `routes`. Route entries accept only
+`object`, `verb`, `subject`, `capabilityId` and
+`capsuleDigest`. Undeclared fields such as `runtime`, `model` or `event` are rejected;
+those values belong in the appropriate canonical input or provider authority.
+
 Exact subjects precede `*` within the same object and operation. Duplicate keys,
 unsupported operations and stale capsule pins fail explicitly. Subjectless list
 and search requests use an object/operation wildcard route. The exact query lives
@@ -159,3 +193,43 @@ search and `other` for comparisons. Both CLI and SDK validate the same object mo
 Working Node transport, capsule interpretation, execution and receipt mechanics
 are reused. Provider-specific behavior belongs behind canonical capabilities,
 whose selected provider may use Node, Python, another runtime or an external service.
+
+## Enforcement and extension rules
+
+The canonical CLI/SDK request envelope accepts only `object`, `verb`, `subject`,
+`other`, `query`, `scenario`, `as`, `via`, `input` and `namespace`. Undeclared SDK
+fields return `REQUEST_FIELD_REJECTED`, just as undeclared shell flags are rejected.
+Domain fields remain unrestricted by this envelope inside `input`; the selected
+capability's contract validates their meaning. Caller fields cannot override the
+adapter, collection, entity type or execution path.
+
+Typed dispatch retains the declared object independently of compatibility
+projection. For example, `capability compare exec-... exec-...` reads capsules;
+`execution compare` reads receipts. Missing capsule authority never falls back
+to an execution receipt with the same spelling. Untyped legacy comparison keeps
+its historical selector rules; use the canonical typed form to disambiguate.
+Invocation and fixture-proof receipts retain their declared object and operation,
+as delegated-operation receipts already do.
+
+The v3 representation also distinguishes `mechanicId`, `providerProfileId` and
+`providerCapabilityId`. A mechanic or profile identity never supplies a missing
+provider capability identity. Undeclared provider fields are `null`; the exact
+native binding remains available. Consumers of the earlier mislabeled v3
+`providerCapabilityId`/`provider` fields should use `mechanicId`/`providerProfileId`
+for those roles. Human summaries name the roles explicitly.
+
+`npm test` includes `test/neutrality.test.mjs`, and the existing CI job runs it.
+The suite checks all supported entity kinds, command-field rejection, overlapping
+identifiers, exact scenario/input/event/outcome identities, object-and-operation
+route isolation, and preservation of canonical input and native dispositions.
+Before the enforcement change, regressions reproduced the identity collision and
+ignored command/route fields. These are behavioral checks, not a claim of managed
+provider admission or a complete semantic audit of every SideFX surface.
+
+New entity types and operations must have a defined shared contract, an actual
+representation or explicit managed delegation boundary, documented evidence scope,
+and matching tests. Instance names, model output and provider descriptors cannot
+extend the vocabulary. The repository's [contribution rules](../AGENTS.md) make
+this invariant explicit for subsequent work. This repository enforces it in its
+CLI/shared SDK; other delivery surfaces must preserve the same contracts and need
+their own conformance evidence.

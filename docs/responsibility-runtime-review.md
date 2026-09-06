@@ -4,8 +4,8 @@ Reviewed September 6, 2026. Repository: [BPMSoftwareSolutions/sidefx-cli](https:
 
 This review describes the implementation recorded in commit `f1087ff3`. The
 subsequent [provider-neutral command model](command-model.md) adds object-first
-grammar, object-scoped routes and catalog search across namespaces. It preserves
-the runtime/provider findings below; profile-based provider selection remains
+grammar, object-scoped routes and catalog search across namespaces. Later fixes
+are noted against individual findings. Profile-based provider selection remains
 an explicit integration requirement.
 
 ## Decision
@@ -120,6 +120,12 @@ required profile, selected provider ID/profile, runtime, binding digest and
 eligibility evidence as distinct fields. A mechanic name or a Node prefix cannot
 establish a provider's eligibility. This mapping needs correction when the shared
 representation contract is introduced; the review leaves source behavior intact.
+
+**Entity-neutrality follow-up:** the local v3 projection now exposes `mechanicId`,
+`providerProfileId` and `providerCapabilityId` separately, retains native bindings,
+and keeps absent provider identities `null`. Terminal summaries label those roles.
+This corrects the reported identity conflation; shared representation-provider
+admission and general profile-based resolution remain separate work.
 
 ### F6 — P2: fixture proof is not semantic/model evaluation
 

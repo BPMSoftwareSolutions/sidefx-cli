@@ -8,6 +8,7 @@ import { isSemanticObject, parseSemanticCommand, validateSemanticRequest } from 
 
 export const help = `SideFX terminal — sfx
 Speak the SideFX capability model: sfx <object> <operation> [identity].
+Entity Neutrality: types select operations; identities and domain values are data.
 
   sfx provider list
   sfx provider search [query] [--namespace NAME]
@@ -66,7 +67,7 @@ Options:
 
 capability evaluate runs existing fixtures. Provider evaluation and admission
 require capability bindings. Catalogs and registered references confer no admission.
-Supplier-specific configuration belongs in provider data, never CLI flags.
+Entity-specific configuration belongs in canonical data, never instance-specific flags.
 Exit 0 means delivery completed; inspect the returned domain disposition.
 Exit 2: usage/input. Exit 3: unavailable boundary. Exit 4: runtime/integrity.
 `;

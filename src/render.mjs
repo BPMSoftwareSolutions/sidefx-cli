@@ -13,7 +13,11 @@ function scenarioText(scenario) {
 function mechanicSummary(providers) {
   const counts = new Map();
   for (const provider of providers) {
-    const key = provider.providerCapabilityId ?? '(undeclared)';
+    const key = [
+      provider.providerCapabilityId && `provider capability ${provider.providerCapabilityId}`,
+      provider.mechanicId && `mechanic ${provider.mechanicId}`,
+      provider.providerProfileId && `profile ${provider.providerProfileId}`,
+    ].filter(Boolean).join(' | ') || '(undeclared)';
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return list([...counts], ([id, count]) => `${id}  (${count} binding${count === 1 ? '' : 's'})`);
