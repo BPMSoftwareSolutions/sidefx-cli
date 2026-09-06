@@ -1,0 +1,21 @@
+{
+  "name": "sidefx-cli",
+  "version": "0.1.0",
+  "description": "The SideFX terminal: a capability command surface over an existing estate",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BPMSoftwareSolutions/sidefx-cli.git"
+  },
+  "homepage": "https://github.com/BPMSoftwareSolutions/sidefx-cli#readme",
+  "bugs": { "url": "https://github.com/BPMSoftwareSolutions/sidefx-cli/issues" },
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "bin": { "sfx": "bin/sfx.mjs" },
+  "exports": "./src/index.mjs",
+  "files": ["bin/", "src/", "README.md", "docs/", "examples/"],
+  "scripts": {
+    "start": "node bin/sfx.mjs",
+    "test": "node --test test/cli.test.mjs test/core.test.mjs test/runtime.test.mjs",
+    "test:integration": "node --test integration/estate.test.mjs"
+  }
+}

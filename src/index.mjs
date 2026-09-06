@@ -1,0 +1,130 @@
+import os from 'node:os';
+import path from 'node:path';
+import { EstateRuntime } from './runtime.mjs';
+import { ReceiptStore, explainReceipt, isExecutionId } from './receipts.mjs';
+import { ProviderCatalog, isProviderId, isCapabilityId } from './catalog.mjs';
+import { projectCapability, revealCapability, structuralDiff } from './projection.mjs';
+import { delegatedVerbs, resolveRoute } from './routes.mjs';
+import { requireValue, SidefxError } from './errors.mjs';
+import { assertJson } from './data.mjs';
+
+export { SidefxError } from './errors.mjs';
+export { EstateRuntime } from './runtime.mjs';
+
+export function createSidefx(options = {}) {
+  return new Sidefx(options);
+}
+
+class Sidefx {
+  constructor(options) {
+    this.runtime = options.runtime ?? new EstateRuntime({
+      estateRoot: options.estateRoot ?? process.env.SIDEFX_ESTATE,
+      timeoutMs: options.timeoutMs,
+    });
+    const stateRoot = options.stateRoot ?? process.env.SIDEFX_HOME ?? path.join(os.homedir(), '.sidefx');
+    this.receipts = new ReceiptStore(stateRoot);
+    this.catalog = new ProviderCatalog({ catalogPaths: options.catalogPaths, stateRoot });
+    this.routesPath = options.routesPath;
+  }
+
+  async inspectCapability(id) {
+    requireValue(isCapabilityId(id), 'CAPABILITY_ID_REJECTED', 'Use an exact hyphenated capability identity.', 2);
+    const response = await this.runtime.request('inspect', { capabilityId: id });
+    return { ...projectCapability(response.result), estateManifestDigest: response.estateManifestDigest };
+  }
+
+  async inspect(id) {
+    return isProviderId(id) ? this.catalog.inspect(id) : this.inspectCapability(id);
+  }
+
+  async invoke(capabilityId, input, { verb = 'invoke', subject = capabilityId, route = null } = {}) {
+    requireValue(input !== undefined, 'INPUT_REQUIRED', 'Supply canonical JSON with --input @file.json, --input JSON, or --input -.', 2);
+    assertJson(input);
+    // Freeze the carrier before asynchronous inspection or receipt persistence.
+    input = JSON.parse(JSON.stringify(input));
+    const capability = await this.inspectCapability(capabilityId);
+    if (route?.capsuleDigest) requireValue(route.capsuleDigest === capability.capsuleDigest,
+      'ROUTE_STALE', 'The route is bound to another capsule digest. Review and update its binding.');
+    return this.receipts.execute({ verb, subject, input, capability,
+      estateManifestDigest: capability.estateManifestDigest, context: route }, () => this.runtime.request('invoke', {
+      capabilityId, input, capsuleDigest: capability.capsuleDigest, estateManifestDigest: capability.estateManifestDigest,
+    }));
+  }
+
+  async delegate(request) {
+    const route = request.via
+      ? { capabilityId: request.via, source: 'EXPLICIT_INVOCATION' }
+      : await resolveRoute(this.routesPath, request.verb, request.subject);
+    return this.invoke(route.capabilityId, request.input, { verb: request.verb, subject: request.subject, route });
+  }
+
+  async execute(request) {
+    const { verb, subject } = request;
+    if (request.via || (request.input !== undefined && delegatedVerbs.includes(verb))) {
+      requireValue(delegatedVerbs.includes(verb), 'OPTION_NOT_APPLICABLE', '--via only applies to delegated capability verbs.', 2);
+      return this.delegate(request);
+    }
+    switch (verb) {
+      case 'list':
+        if (subject === 'executions') return { executions: await this.receipts.list() };
+        if (subject === 'providers') return { providers: await this.catalog.records(), registered: await this.catalog.registered() };
+        requireValue(!subject || subject === 'capabilities', 'COLLECTION_REJECTED', 'List capabilities, providers, or executions.', 2);
+        return this.runtime.request('list');
+      case 'find': return this.runtime.request('list', { query: subject });
+      case 'search':
+        return subject === 'estate'
+          ? this.runtime.request('list', { query: request.query })
+          : { namespace: subject, evidenceScope: 'DISCOVERY_TESTIMONY', providers: await this.catalog.search(subject, request.query) };
+      case 'inspect': return this.inspect(subject);
+      case 'scenarios': {
+        const capability = await this.inspectCapability(subject);
+        return { capabilityId: subject, capsuleDigest: capability.capsuleDigest,
+          rootScenarioId: capability.rootScenarioId, scenarios: capability.scenarios };
+      }
+      case 'reveal': {
+        requireValue(!isProviderId(subject), 'PROVIDER_REPRESENTATION_UNAVAILABLE',
+          'Provider discovery has no admitted blueprint. Inspect its descriptor or reveal an admitted capability identity.');
+        const capability = await this.inspectCapability(subject);
+        return { capsuleDigest: capability.capsuleDigest, ...revealCapability(capability, request) };
+      }
+      case 'providers': {
+        const capability = await this.inspectCapability(subject);
+        return { capabilityId: subject, capsuleDigest: capability.capsuleDigest,
+          bindingSource: capability.plan, boundMechanics: capability.providers,
+          discoveryCandidates: (await this.catalog.records()).filter(provider => provider.candidateCapabilities.includes(subject)) };
+      }
+      case 'resolve': {
+        if (this.routesPath) return this.delegate(request);
+        const response = await this.runtime.request('resolve', { capabilityId: subject });
+        return { ...response, resolutionScope: 'CURRENT_CAPSULE_AND_DECLARED_DEPENDENCIES' };
+      }
+      case 'invoke': return this.invoke(subject, request.input);
+      case 'evaluate': {
+        if (request.provider || isProviderId(subject) || this.routesPath) return this.delegate(request);
+        const capability = await this.inspectCapability(subject);
+        return this.receipts.execute({ verb, subject, capability, estateManifestDigest: capability.estateManifestDigest,
+          context: { evaluationScope: 'CAPSULE_FIXTURE_PROOF' } }, () => this.runtime.request('evaluate', {
+          capabilityId: subject, capsuleDigest: capability.capsuleDigest, estateManifestDigest: capability.estateManifestDigest,
+        }));
+      }
+      case 'observe': return this.receipts.read(subject);
+      case 'explain': return explainReceipt(await this.receipts.read(subject));
+      case 'compare': {
+        if (this.routesPath) return this.delegate(request);
+        const read = async id => isExecutionId(id) ? this.receipts.read(id) : this.inspect(id);
+        const [left, right] = await Promise.all([read(subject), read(request.other)]);
+        return { comparisonScope: 'STRUCTURAL_DIFFERENCE', left: subject, right: request.other,
+          changes: structuralDiff(left, right) };
+      }
+      case 'provider':
+        if (request.action === 'add') return this.catalog.add(subject);
+        if (request.action === 'remove') return this.catalog.remove(subject);
+        if (request.action === 'list') return { registered: await this.catalog.registered() };
+        throw new SidefxError('PROVIDER_ACTION_REJECTED', 'Use sfx provider add, remove, or list.', 2);
+      case 'verify': return this.runtime.request('verify');
+      default:
+        if (delegatedVerbs.includes(verb)) return this.delegate(request);
+        throw new SidefxError('COMMAND_REJECTED', `Unknown command ${verb}. Run sfx --help.`, 2);
+    }
+  }
+}
