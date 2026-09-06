@@ -16,6 +16,19 @@ may satisfy different profiles. The current CLI does not yet implement that
 general provider-resolution circuit. Its shared SDK is a useful integration seam.
 See the [responsibility and runtime review](docs/responsibility-runtime-review.md).
 
+**Provider Neutrality Law:** no provider, vendor, ecosystem, transport, language,
+or implementation technology introduces a top-level command or changes the
+canonical grammar to expose its own mechanics. `sfx` speaks the SideFX capability
+model; providers supply data and mechanics behind it.
+
+```text
+sfx <object> <operation> [identity]
+```
+
+The objects are `provider`, `capability`, `scenario`, `capsule`, `execution`,
+`estate`, `profile`, and `evidence`. The [command model](docs/command-model.md)
+defines supported operations, current evidence scopes, delegation and compatibility.
+
 ## Run it
 
 Requires Node.js 20 or newer. This package has no npm dependencies. The estate
@@ -34,7 +47,7 @@ From the workspace:
 ```powershell
 npm ci
 node bin/sfx.mjs --help
-node bin/sfx.mjs list capabilities --estate C:\lab\repos\agentic-harness
+node bin/sfx.mjs capability list --estate C:\lab\repos\agentic-harness
 ```
 
 To make `sfx` available on your command path:
@@ -47,18 +60,18 @@ Choose the estate once per shell. PowerShell:
 
 ```powershell
 $env:SIDEFX_ESTATE = 'C:\lab\repos\agentic-harness'
-sfx find interlock
-sfx inspect interlock-agent-operation
-sfx scenarios interlock-agent-operation
-sfx reveal interlock-agent-operation --scenario adjudicate-covered-agent-tool-call
+sfx capability search interlock
+sfx capability inspect interlock-agent-operation
+sfx scenario list interlock-agent-operation
+sfx capsule reveal interlock-agent-operation --scenario adjudicate-covered-agent-tool-call
 ```
 
 Linux or macOS:
 
 ```bash
 export SIDEFX_ESTATE=/path/to/agentic-harness
-sfx list capabilities
-sfx inspect interlock-agent-operation
+sfx capability list
+sfx capability inspect interlock-agent-operation
 ```
 
 The command grammar is identical across shells; only environment-variable and
@@ -67,13 +80,14 @@ quoting syntax differ. Use `--input @request.json` to avoid shell JSON quoting.
 ## Engineering flow
 
 ```text
-sfx find interlock
-sfx inspect interlock-agent-operation
-sfx scenarios interlock-agent-operation
-sfx reveal interlock-agent-operation --as contracts
-sfx reveal deliver-capsule-estate-cli --as blueprint
-sfx providers interlock-agent-operation
-sfx resolve interlock-agent-operation
+sfx capability search interlock
+sfx capability inspect interlock-agent-operation
+sfx scenario list interlock-agent-operation
+sfx capability reveal interlock-agent-operation --as contracts
+sfx capsule reveal deliver-capsule-estate-cli --as blueprint
+sfx capability providers interlock-agent-operation
+sfx capability resolve interlock-agent-operation
+sfx estate inspect
 ```
 
 `reveal` reads the exact capsule's feature, blueprint, scenario geometry, or
@@ -85,7 +99,7 @@ the selected scenario in the complete, unchanged blueprint.
 closure. A provider-selection request can instead delegate to its own authority:
 
 ```text
-sfx resolve provider-selection --via resolve-sidefx-eligible-providers --input @request.json
+sfx capability resolve provider-selection --via resolve-sidefx-eligible-providers --input @request.json
 ```
 
 Inspect the selected capability's current contracts before preparing its input.
@@ -95,11 +109,11 @@ it is not inserted into the canonical input or used as policy.
 ## Execute and inspect evidence
 
 ```text
-sfx invoke resolve-sidefx-eligible-providers --input @request.json --json
-sfx observe exec-UUID --json
-sfx explain exec-UUID
-sfx list executions
-sfx compare exec-UUID-ONE exec-UUID-TWO
+sfx capability invoke resolve-sidefx-eligible-providers --input @request.json --json
+sfx execution observe exec-UUID --json
+sfx execution explain exec-UUID
+sfx execution list
+sfx execution compare exec-UUID-ONE exec-UUID-TWO
 ```
 
 Replace `exec-UUID` with the exact ID returned by invocation. JSON can also be
@@ -129,11 +143,11 @@ external effects. The terminal never retries an invocation automatically.
 ## Discover providers
 
 ```text
-sfx search rapidapi weather --catalog examples/provider-catalog.json
-sfx search cncf observability --catalog examples/provider-catalog.json
+sfx provider search weather --catalog examples/provider-catalog.json
+sfx provider search observability --namespace cncf --catalog examples/provider-catalog.json
 sfx provider add rapidapi/weatherapi
-sfx inspect rapidapi/weatherapi --catalog examples/provider-catalog.json
-sfx provider list
+sfx provider inspect rapidapi/weatherapi --catalog examples/provider-catalog.json
+sfx provider list --catalog examples/provider-catalog.json
 ```
 
 The included catalog is **illustrative**, derived from the intent document.
@@ -144,33 +158,46 @@ duplicate identities fail explicitly. Other namespaces use the same format.
 
 `provider add` registers a local reference. It does not contact the provider or
 admit its capabilities. `provider remove` removes only that local reference.
-`providers <capability>` shows capsule-bound mechanics separately from matching
-discovery candidates. Live RapidAPI/CNCF discovery needs a discovery provider;
-there is no built-in marketplace scraper or automatic credential use.
+`provider search` searches all supplied catalogs; `--namespace NAME` is an optional
+data filter. `provider list` returns catalog descriptors and registered references
+separately. `capability providers <capability>` shows capsule-bound mechanics
+separately from matching discovery candidates.
+
+Live discovery uses `sfx provider discover <source> --via <discovery-capability>
+--input @discovery.json`. Managed provider observations can use the same binding
+form with `provider inspect`. Source dialect, authentication, transport and native
+operations belong to the selected provider capability. The CLI has no marketplace
+scraper, vendor flags or automatic credential use.
 
 ## Evaluate, assimilate and govern
 
 ```text
-sfx evaluate resolve-sidefx-eligible-providers
-sfx evaluate rapidapi/weatherapi --via <evaluation-capability> --input @evaluation.json
-sfx assimilate rapidapi/weatherapi --via <assimilation-capability> --input @assimilation.json
-sfx author <subject> --via <authoring-capability> --input @authoring.json
-sfx install <subject> --via <realization-capability> --input @realization.json
-sfx govern <subject> --via <governance-capability> --input @governance.json
-sfx publish <subject> --via <publication-capability> --input @publication.json
+sfx capability evaluate resolve-sidefx-eligible-providers
+sfx provider evaluate rapidapi/weatherapi --via <evaluation-capability> --input @evaluation.json
+sfx provider admit rapidapi/weatherapi --via <admission-capability> --input @admission.json
+sfx provider assimilate rapidapi/weatherapi --via <assimilation-capability> --input @assimilation.json
+sfx capability author <capability> --via <authoring-capability> --input @authoring.json
+sfx capability install <capability> --via <realization-capability> --input @realization.json
+sfx capability govern <capability> --via <governance-capability> --input @governance.json
+sfx capability publish <capability> --via <publication-capability> --input @publication.json
 ```
 
-Angle-bracket values above must identify actual estate capabilities. Evaluation
-without a binding runs a named capability's existing fixtures and labels its
+Angle-bracket values above must identify actual estate capabilities. Capability
+evaluation without a binding runs the named capability's existing fixtures and labels its
 receipt `CAPSULE_FIXTURE_PROOF`. It makes no provider-conformance claim.
-Provider evaluation and the other actions require explicit capability bindings.
+Provider evaluation, admission and the other lifecycle actions require explicit
+capability bindings. The illustrative catalog supplies no live evaluator. Profile
+queries also delegate to a bound capability; the CLI does not infer provider
+eligibility from a namespace or manufacture a profile registry.
 
 For reusable bindings, supply `--routes routes.json` instead of `--via`. A route
-document has `routesType: "sfx-surface-routes.v1"` and a `routes` array. Each route
-contains `verb`, `subject`, `capabilityId`, and `capsuleDigest`; read the latter
-from `sfx inspect <capability> --json`. A subject of `*` is a fallback; exact
+document has `routesType: "sfx-surface-routes.v2"` and a `routes` array. Each route
+contains `object`, `verb`, `subject`, `capabilityId`, and `capsuleDigest`; read the latter
+from `sfx capability inspect <capability> --json`. A subject of `*` is a fallback; exact
 subjects take precedence. Changed capsule digests fail with `ROUTE_STALE`.
-Routes are transport configuration, not new capability authority.
+Routes match within the same object and operation. They are transport configuration,
+not new capability authority. Existing verb-first commands remain compatibility
+aliases and retain v1 route support; object-first commands require v2 routes.
 
 The Harness owns the managed lifecycle, including review, proof, admission,
 sealing and publication. The terminal cannot skip a lifecycle stage or turn
@@ -183,11 +210,13 @@ return `CAPABILITY_ROUTE_REQUIRED`; they never return fabricated success.
 import { createSidefx } from 'sidefx-cli';
 
 const sfx = createSidefx({ estateRoot: '/path/to/agentic-harness' });
-const capability = await sfx.inspect('interlock-agent-operation');
-const scenarios = await sfx.execute({ verb: 'scenarios', subject: capability.capabilityId });
+const capability = await sfx.execute({ object: 'capability', verb: 'inspect', subject: 'interlock-agent-operation' });
+const scenarios = await sfx.execute({ object: 'scenario', verb: 'list', subject: capability.capabilityId });
 ```
 
-`execute()` accepts the same verbs used by the shell. `invoke(id, input)` performs
+`execute()` accepts the same object/operation requests used by the shell, including
+`{ object: 'provider', verb: 'search', query: 'weather', namespace: 'rapidapi' }`.
+Legacy requests without `object` remain supported. `invoke(id, input)` performs
 an exact capability invocation and returns its execution ID and canonical result.
 `EstateRuntime` is exported for consumers that need the shared bootstrap adapter.
 

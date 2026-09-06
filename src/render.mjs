@@ -1,3 +1,5 @@
+import { projectSemanticRequest } from './commands.mjs';
+
 const pretty = value => JSON.stringify(value, null, 2);
 const safe = value => String(value ?? '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '');
 const section = (name, value) => `${name}\n${'-'.repeat(name.length)}\n${value}`;
@@ -36,7 +38,7 @@ function format(request, value) {
     section('Scenarios', list(value.scenarios, scenario => scenario.scenarioId)),
     section('Bound mechanics', mechanicSummary(value.providers)),
     section('Authority', `${value.capsuleDigest}\n${value.capabilityAuthorityDigest}`),
-    'Use sfx reveal <capability> --as contracts to inspect canonical input.',
+    'Use sfx capability reveal <capability> --as contracts to inspect canonical input.',
   ].join('\n\n');
   if (request.verb === 'scenarios') return section('Scenarios', list(value.scenarios, item => item.scenarioId));
   if (request.verb === 'reveal' && value.scenarios) return list(value.scenarios, scenarioText);
@@ -46,13 +48,15 @@ function format(request, value) {
     section('Resolution scope', value.resolutionScope),
     section('Estate dependency closure', pretty(value.result.dependencyResolution)),
   ].join('\n\n');
-  if (value.providers && request.verb === 'search') return section(`Discovery: ${value.namespace}`, list(value.providers,
+  if (value.providers && request.verb === 'search') return section(`Discovery: ${value.namespace ?? 'all configured providers'}`, list(value.providers,
     provider => `${provider.providerId}  ${provider.name}  [${provider.source.kind}]`));
   if (value.executionId && value.executionState && request.verb !== 'observe' && request.verb !== 'explain') return [
     `Execution ${value.executionId}`, `Delivery ${value.executionState}`, section('Canonical result', pretty(value.result)),
-    `Evidence ${value.receiptDigest}`, `Observe: sfx observe ${value.executionId}`,
+    `Evidence ${value.receiptDigest}`, `Observe: sfx execution observe ${value.executionId}`,
   ].join('\n\n');
   return pretty(value);
 }
 
-export function render(request, value) { return safe(format(request, value)); }
+export function render(request, value) {
+  return safe(format(request.object ? projectSemanticRequest(request) : request, value));
+}

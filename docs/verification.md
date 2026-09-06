@@ -41,10 +41,31 @@ The package is `sidefx-cli@0.1.0`; its executable remains `sfx`.
 | Installed SDK | Importing `createSidefx` from `sidefx-cli` succeeded |
 | Review references | All 18 relative source/document references resolved; referenced line numbers exist |
 
-Windows blocked renaming the open original workspace. Automatic approval review
-then rejected the move-and-cleanup command with `blocked by policy`; that command
-did not run. The completed transfer used a verified copy instead, so
-`C:\lab\repos\sidefx-verbs` remains as the original snapshot. Open
-`C:\lab\repos\sidefx-cli` as the workspace for subsequent development. Removing
-the original directory and updating the desktop app's saved workspace remain
-outstanding. No commit or push was performed.
+The initial transfer used a verified copy after Windows blocked renaming the
+open workspace. The user subsequently pushed the repository and removed the
+original folder. Follow-up verification confirmed that
+`C:\lab\repos\sidefx-verbs` no longer exists and that local `main` and the
+remote `refs/heads/main` both point to
+`f1087ff3b938ca9db2a250ebd610a99a80db39c1`. The working tree was clean before
+this documentation update. Continue development in `C:\lab\repos\sidefx-cli`.
+
+## Provider-neutral command model
+
+The subsequent command-model change adds object-first CLI/SDK requests and v2
+routes while retaining existing verb-first mechanics and v1 routes. This change
+updates the earlier interface implementation; the preservation measurements above
+describe the repository-name transfer, not the later grammar work.
+
+| Check | Observed result |
+| --- | --- |
+| Portable unit/process suite | All 31 tests passed on Windows with Node 20.19.0 |
+| Neutral grammar | Known and previously unknown provider namespaces use the same commands; vendor commands, vendor flags and unsupported object/operation pairs are rejected |
+| Catalog scope | Search covers all configured catalogs; even the namespace `estate` remains provider data |
+| Managed operation boundaries | Provider lifecycle and profile requests require bindings; provider evaluation never becomes fixture evaluation; canonical input and native holding results are retained |
+| Route isolation | v2 object/operation keys, exact-before-wildcard matching, v1/v2 separation, duplicate rejection, stale pins and input snapshots verified |
+| Live integration | Passed against 219 estate capabilities using object-first discovery, invocation, observation and fixture evaluation; direct runtime parity and CLI/SDK receipt parity retained |
+| Installed command | Packed and installed into `.sidefx/object-command-smoke`; the generated `sfx.cmd` ran generic provider search with a namespace data filter |
+
+The new grammar does not supply live provider credentials, evaluator mechanics,
+admission decisions or automatic profile-based provider resolution. The live test
+invoked only the existing read-only estate resolver and its focused fixtures.

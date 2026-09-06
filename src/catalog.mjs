@@ -43,10 +43,10 @@ export class ProviderCatalog {
 
   async search(namespace, query = '') {
     const records = await this.records();
-    requireValue(records.some(provider => provider.providerId.startsWith(`${namespace}/`)),
-      'DISCOVERY_SOURCE_REQUIRED', `No ${namespace} catalog is configured. Supply --catalog FILE with declared provider observations.`);
+    requireValue(this.paths.length > 0 && (namespace == null || records.some(provider => provider.providerId.startsWith(`${namespace}/`))),
+      'DISCOVERY_SOURCE_REQUIRED', `No ${namespace ?? 'provider'} catalog is configured. Supply --catalog FILE with declared provider observations.`);
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return records.filter(provider => provider.providerId.startsWith(`${namespace}/`)
+    return records.filter(provider => (namespace == null || provider.providerId.startsWith(`${namespace}/`))
       && words.every(word => JSON.stringify(provider).toLowerCase().includes(word)));
   }
 

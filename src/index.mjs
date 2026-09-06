@@ -7,6 +7,7 @@ import { projectCapability, revealCapability, structuralDiff } from './projectio
 import { delegatedVerbs, resolveRoute } from './routes.mjs';
 import { requireValue, SidefxError } from './errors.mjs';
 import { assertJson } from './data.mjs';
+import { validateSemanticRequest, projectSemanticRequest } from './commands.mjs';
 
 export { SidefxError } from './errors.mjs';
 export { EstateRuntime } from './runtime.mjs';
@@ -52,13 +53,24 @@ class Sidefx {
   }
 
   async delegate(request) {
-    const route = request.via
-      ? { capabilityId: request.via, source: 'EXPLICIT_INVOCATION' }
-      : await resolveRoute(this.routesPath, request.verb, request.subject);
-    return this.invoke(route.capabilityId, request.input, { verb: request.verb, subject: request.subject, route });
+    const { object, verb, subject, via } = request;
+    let input = request.input;
+    if (input !== undefined) { assertJson(input); input = JSON.parse(JSON.stringify(input)); }
+    const route = via
+      ? { capabilityId: via, source: 'EXPLICIT_INVOCATION' }
+      : await resolveRoute(this.routesPath, verb, subject, object);
+    const context = object ? { ...route, object, operation: verb } : route;
+    return this.invoke(route.capabilityId, input, { verb, subject: subject ?? '*', route: context });
   }
 
   async execute(request) {
+    if (request.object !== undefined) {
+      const spec = validateSemanticRequest(request, { routes: Boolean(this.routesPath) });
+      if (!spec.projection || (spec.bindable && (request.via || this.routesPath || request.input !== undefined))) {
+        return this.delegate(request);
+      }
+      request = projectSemanticRequest(request);
+    }
     const { verb, subject } = request;
     if (request.via || (request.input !== undefined && delegatedVerbs.includes(verb))) {
       requireValue(delegatedVerbs.includes(verb), 'OPTION_NOT_APPLICABLE', '--via only applies to delegated capability verbs.', 2);
@@ -72,7 +84,7 @@ class Sidefx {
         return this.runtime.request('list');
       case 'find': return this.runtime.request('list', { query: subject });
       case 'search':
-        return subject === 'estate'
+        return subject === 'estate' && request.collection !== 'providers'
           ? this.runtime.request('list', { query: request.query })
           : { namespace: subject, evidenceScope: 'DISCOVERY_TESTIMONY', providers: await this.catalog.search(subject, request.query) };
       case 'inspect': return this.inspect(subject);
@@ -110,7 +122,7 @@ class Sidefx {
       case 'observe': return this.receipts.read(subject);
       case 'explain': return explainReceipt(await this.receipts.read(subject));
       case 'compare': {
-        if (this.routesPath) return this.delegate(request);
+        if (this.routesPath && !request.localOnly) return this.delegate(request);
         const read = async id => isExecutionId(id) ? this.receipts.read(id) : this.inspect(id);
         const [left, right] = await Promise.all([read(subject), read(request.other)]);
         return { comparisonScope: 'STRUCTURAL_DIFFERENCE', left: subject, right: request.other,

@@ -2,6 +2,12 @@
 
 Reviewed September 6, 2026. Repository: [BPMSoftwareSolutions/sidefx-cli](https://github.com/BPMSoftwareSolutions/sidefx-cli).
 
+This review describes the implementation recorded in commit `f1087ff3`. The
+subsequent [provider-neutral command model](command-model.md) adds object-first
+grammar, object-scoped routes and catalog search across namespaces. It preserves
+the runtime/provider findings below; profile-based provider selection remains
+an explicit integration requirement.
+
 ## Decision
 
 Keep the working Node terminal as a candidate interface provider. Do not rewrite
@@ -25,10 +31,10 @@ become platform-wide behavior.
 
 ### F1 — P1: execution does not resolve a capability profile to eligible providers
 
-[`EstateRuntime.request`](../src/runtime.mjs#L17) constructs
+[`EstateRuntime.request`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/runtime.mjs#L17) constructs
 `node_modules/sda-bootstrap/src/capsule-manager.mjs` and forks a Node worker.
-[`Sidefx.delegate`](../src/index.mjs#L54) selects an exact capability ID from
-`--via` or a route file; [`resolveRoute`](../src/routes.mjs#L7) supports exact and
+[`Sidefx.delegate`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/index.mjs#L54) selects an exact capability ID from
+`--via` or a route file; [`resolveRoute`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/routes.mjs#L7) supports exact and
 wildcard subject matching plus a capsule digest. Neither selects from provider
 families using a required profile, environment constraints and conformance evidence.
 The default `resolve` operation checks capsule/dependency closure, as its output
@@ -47,10 +53,10 @@ providers. The CLI should carry the selected plan, not rank languages itself.
 
 ### F2 — P1: representation interpretation is also an execution prerequisite
 
-[`projectCapability`](../src/projection.mjs#L21) selects
+[`projectCapability`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/projection.mjs#L21) selects
 `runtimeBindings[0]`, understands exactly three execution-plan versions, and
-joins v3 cells to feature tags. The [worker](../src/runtime-worker.mjs#L29) imports
-Gherkin through the bootstrap installation. [`invoke`](../src/index.mjs#L40)
+joins v3 cells to feature tags. The [worker](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/runtime-worker.mjs#L29) imports
+Gherkin through the bootstrap installation. [`invoke`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/index.mjs#L40)
 calls `inspectCapability`, which performs that full projection before invoking.
 
 **Consequence:** a valid executable capsule with another representation or runtime
@@ -65,9 +71,9 @@ Terminal layout and text formatting remain local interface mechanics.
 
 ### F3 — P2: provider discovery and matching policy are embedded in the SDK
 
-[`ProviderCatalog.records/search`](../src/catalog.mjs#L16) validates a local
+[`ProviderCatalog.records/search`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/catalog.mjs#L16) validates a local
 descriptor vocabulary and implements AND-of-words substring matching over the
-entire serialized descriptor. [`providers`](../src/index.mjs#L90) matches
+entire serialized descriptor. [`providers`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/index.mjs#L90) matches
 candidate capability IDs by exact array membership. `find` delegates an estate
 identity substring query to the bootstrap. There is no semantic retrieval,
 ranking, embedding, taxonomy inference or conformance evaluation here.
@@ -85,9 +91,9 @@ unmanaged library inserted into `search()`.
 
 ### F4 — P2: local receipt rules need a shared evidence profile before reuse
 
-[`ReceiptStore`](../src/receipts.mjs#L9) owns its receipt schema and
+[`ReceiptStore`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/receipts.mjs#L9) owns its receipt schema and
 `RUNNING -> RETURNED | DELIVERY_FAILED` delivery states.
-[`canonical/digest/redact`](../src/data.mjs#L18) define key ordering, JSON
+[`canonical/digest/redact`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/data.mjs#L18) define key ordering, JSON
 serialization and a secret-field-name policy. This is explicitly local testimony,
 which is an appropriate scope for the present journal.
 
@@ -104,7 +110,7 @@ do not turn every filesystem helper into a remote capability call.
 
 ### F5 — P2: a v3 mechanic identity is labeled as a provider capability identity
 
-The [v3 projection](../src/projection.mjs#L61) assigns
+The [v3 projection](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/projection.mjs#L61) assigns
 `binding.mechanicId` to `providerCapabilityId`, while separately retaining
 `providerProfileId` as `provider`. These are different roles in the requested
 resolution hierarchy. The native record is preserved, which allows correction.
@@ -117,7 +123,7 @@ representation contract is introduced; the review leaves source behavior intact.
 
 ### F6 — P2: fixture proof is not semantic/model evaluation
 
-[`evaluate`](../src/index.mjs#L102) without a route calls
+[`evaluate`](https://github.com/BPMSoftwareSolutions/sidefx-cli/blob/f1087ff3b938ca9db2a250ebd610a99a80db39c1/src/index.mjs#L102) without a route calls
 `proveDirectExecution` and labels its receipt `CAPSULE_FIXTURE_PROOF`. That labeling
 is correct. `assimilate`, `author`, `install`, `govern` and `publish` require a bound
 capability; no corresponding business implementation is hidden in the terminal.

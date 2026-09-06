@@ -1,26 +1,33 @@
 import { digest, readJson } from './data.mjs';
 import { requireValue } from './errors.mjs';
 import { isCapabilityId } from './catalog.mjs';
+import { semanticCommand } from './commands.mjs';
 
 export const delegatedVerbs = ['evaluate', 'assimilate', 'author', 'resolve', 'install', 'publish', 'govern', 'compare'];
 
-export async function resolveRoute(routesPath, verb, subject) {
+export async function resolveRoute(routesPath, verb, subject, object) {
   requireValue(routesPath, 'CAPABILITY_ROUTE_REQUIRED',
     `${verb} requires an explicit capability binding. Use --via CAPABILITY --input @request.json, or --routes FILE.`);
   const document = await readJson(routesPath);
-  requireValue(document.routesType === 'sfx-surface-routes.v1' && Array.isArray(document.routes),
-    'ROUTES_REJECTED', 'Expected sfx-surface-routes.v1 with a routes array.', 2);
+  const typed = document.routesType === 'sfx-surface-routes.v2';
+  requireValue((typed || document.routesType === 'sfx-surface-routes.v1') && Array.isArray(document.routes),
+    'ROUTES_REJECTED', 'Expected sfx-surface-routes.v1 or v2 with a routes array.', 2);
+  requireValue(typed === (object !== undefined), 'ROUTE_OBJECT_REQUIRED',
+    'Object-first commands require v2 routes with explicit objects; verb-first aliases use v1 routes.', 2);
   const keys = new Set();
   for (const route of document.routes) {
-    const key = `${route.verb}:${route.subject}`;
-    requireValue(delegatedVerbs.includes(route.verb) && typeof route.subject === 'string'
+    requireValue(route && typeof route === 'object' && !Array.isArray(route), 'ROUTES_REJECTED', 'Each route must be an object.', 2);
+    const key = JSON.stringify([route.object ?? null, route.verb, route.subject]);
+    requireValue((typed ? semanticCommand(route.object, route.verb)?.bindable
+      : route.object === undefined && delegatedVerbs.includes(route.verb)) && typeof route.subject === 'string'
       && route.subject.length > 0 && isCapabilityId(route.capabilityId)
       && /^sha256:[a-f0-9]{64}$/.test(route.capsuleDigest) && !keys.has(key),
-    'ROUTES_REJECTED', 'Routes require unique verb/subject pairs, capabilityId and exact capsuleDigest.', 2);
+    'ROUTES_REJECTED', 'Routes require unique object/verb/subject bindings, capabilityId and exact capsuleDigest.', 2);
     keys.add(key);
   }
-  const route = document.routes.find(item => item.verb === verb && item.subject === subject)
-    ?? document.routes.find(item => item.verb === verb && item.subject === '*');
+  const matches = item => item.object === object && item.verb === verb;
+  const route = document.routes.find(item => matches(item) && item.subject === subject)
+    ?? document.routes.find(item => matches(item) && item.subject === '*');
   requireValue(route, 'CAPABILITY_ROUTE_REQUIRED', `No ${verb} route for ${subject}.`);
   return { ...route, routeDigest: digest(route) };
 }

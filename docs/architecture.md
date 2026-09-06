@@ -3,6 +3,11 @@
 The updated [intent](intent.md) establishes `sfx` as the terminal command name.
 SideFX remains the product and capability namespace.
 
+The adopted [Provider Neutrality Law and command model](command-model.md) make
+`sfx <object> <operation> [identity]` canonical. The shared CLI/SDK command model
+validates semantic object/operation pairs and projects supported local operations
+onto existing mechanics. Provider identities and namespace filters are data.
+
 Repository and package: `sidefx-cli`. This document describes the current Node
 candidate implementation. It does not assign semantic capability ownership to
 Node. The [responsibility review](responsibility-runtime-review.md) identifies
@@ -59,17 +64,25 @@ semantic equivalence.
 
 | Intent surface | Implemented boundary |
 | --- | --- |
-| `list`, `find`, `inspect` | Verified estate discovery and capsule-owned meaning |
-| `scenarios`, `reveal` | Existing scenario, blueprint, feature and contract views |
-| `providers` | Existing mechanic bindings plus separately labeled catalog candidates |
-| `resolve` | Existing capsule/dependency closure, or an explicitly delegated resolver |
-| `invoke` | Exact canonical JSON to the existing capsule runtime |
-| `observe`, `explain` | Durable local delivery receipts and original returned testimony |
-| `compare` | Structural differences, or an explicitly delegated comparison authority |
-| `search rapidapi`, `search cncf` | Supplied discovery catalogs with provenance |
+| `capability list/search/inspect` | Verified estate discovery and capsule-owned meaning |
+| `scenario list/inspect`, `capsule reveal` | Existing scenario, blueprint, feature and contract views |
+| `capability providers` | Existing mechanic bindings plus separately labeled catalog candidates |
+| `capability resolve` | Existing capsule/dependency closure, or an explicitly delegated resolver |
+| `capability invoke` | Exact canonical JSON to the existing capsule runtime |
+| `execution observe/explain`, `evidence inspect` | Durable local delivery receipts and original returned testimony |
+| Object-scoped `compare` | Structural differences, or an explicitly delegated comparison authority where supported |
+| `provider search/inspect/list` | Supplied discovery catalogs with provenance and separate reference records |
 | `provider add` | Local reference registration |
-| `evaluate` | Named capsule fixture proof, or an explicitly delegated evaluator |
-| `assimilate`, `author`, `install`, `govern`, `publish` | Explicit capability routes and canonical input; lifecycle remains in the estate |
+| `capability evaluate` | Named capsule fixture proof, or an explicitly delegated evaluator |
+| `provider discover/evaluate/admit/configure`, `profile` queries | Explicit capability routes and canonical input |
+| Object-scoped `assimilate/author/install/govern/publish/admit` | Explicit capability routes and canonical input; lifecycle remains in the estate |
+| `estate inspect` | Verified estate integrity and durable layout |
+
+Object-first routes use v2 keys containing object, operation and subject. Exact
+subject matching and wildcard fallback stay within the same object/operation.
+Legacy verb-first requests retain v1 routes. Binding configuration and argument
+normalization do not establish provider eligibility or admission. Local profile
+inference and supplier-specific command branches are absent.
 
 Live discovery, WeatherAPI invocation, provider assimilation, provider selection
 policy, remote distribution, and enterprise publication need the corresponding

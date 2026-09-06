@@ -139,6 +139,92 @@ test('discovery retains provenance and local registration never admits a provide
   assert.equal((await catalog.registered()).length, 1);
 });
 
+test('provider search spans catalogs and never interprets a namespace as an estate command', async t => {
+  const stateRoot = await temporary(t);
+  const runtime = fakeRuntime();
+  const catalogPath = path.join(stateRoot, 'providers.json');
+  const providers = ['estate/service', 'custom/service'].map(providerId => ({ providerId, name: 'Example service',
+    source: { kind: 'DECLARED', reference: 'fixture' }, operations: [], candidateCapabilities: [] }));
+  await writeFile(catalogPath, JSON.stringify({ catalogType: 'sfx-provider-catalog.v1', providers }));
+  const sdk = createSidefx({ stateRoot, runtime, catalogPaths: [catalogPath] });
+  assert.equal((await sdk.execute({ object: 'provider', verb: 'search' })).providers.length, 2);
+  const result = await sdk.execute({ object: 'provider', verb: 'search', namespace: 'estate', query: 'service' });
+  assert.deepEqual(result.providers.map(provider => provider.providerId), ['estate/service']);
+  await sdk.execute({ object: 'provider', verb: 'add', subject: 'facility/drone-17' });
+  const listed = await sdk.execute({ object: 'provider', verb: 'list' });
+  assert.equal(listed.providers.length, 2);
+  assert.equal(listed.registered[0].providerId, 'facility/drone-17');
+  assert.equal(runtime.calls.length, 0);
+  await assert.rejects(createSidefx({ stateRoot, runtime }).execute({ object: 'provider', verb: 'search' }),
+    error => error.code === 'DISCOVERY_SOURCE_REQUIRED');
+});
+
+test('provider lifecycle and profile queries require managed bindings and never fall back to fixture proof', async t => {
+  const runtime = fakeRuntime();
+  const sdk = createSidefx({ stateRoot: await temporary(t), runtime });
+  for (const verb of ['discover', 'evaluate', 'admit', 'configure', 'assimilate']) {
+    await assert.rejects(sdk.execute({ object: 'provider', verb, subject: 'custom/service' }),
+      error => error.code === 'CAPABILITY_ROUTE_REQUIRED');
+  }
+  await assert.rejects(sdk.execute({ object: 'profile', verb: 'list' }), error => error.code === 'CAPABILITY_ROUTE_REQUIRED');
+  assert.equal(runtime.calls.length, 0);
+  const input = { contractId: 'evaluation.v1', payload: { providerId: 'custom/service', cases: [] } };
+  const result = await sdk.execute({ object: 'provider', verb: 'evaluate', subject: 'custom/service', via: 'evaluate-provider', input });
+  assert.deepEqual(runtime.calls[1].input, input);
+  assert.equal(runtime.calls[1].capabilityId, 'evaluate-provider');
+  assert.equal(runtime.calls[1].operation, 'invoke');
+  assert.equal((await sdk.receipts.read(result.executionId)).context.object, 'provider');
+  assert.equal(result.result.outcome.payload.disposition, 'PROVIDER_REQUIRED');
+  await sdk.execute({ object: 'capability', verb: 'evaluate', subject: 'observe-example' });
+  assert.equal(runtime.calls.at(-1).operation, 'evaluate');
+});
+
+test('v2 routes isolate object kinds, preserve exact precedence and snapshot input before lookup', async t => {
+  const stateRoot = await temporary(t);
+  const routesPath = path.join(stateRoot, 'routes.json');
+  const pin = `sha256:${'a'.repeat(64)}`;
+  const routes = [
+    { object: 'provider', verb: 'evaluate', subject: '*', capabilityId: 'evaluate-provider', capsuleDigest: pin },
+    { object: 'provider', verb: 'evaluate', subject: 'custom/exact', capabilityId: 'evaluate-exact', capsuleDigest: pin },
+    { object: 'capability', verb: 'evaluate', subject: '*', capabilityId: 'evaluate-capability', capsuleDigest: pin },
+  ];
+  const save = () => writeFile(routesPath, JSON.stringify({ routesType: 'sfx-surface-routes.v2', routes }));
+  await save();
+  const runtime = fakeRuntime();
+  const sdk = createSidefx({ stateRoot, runtime, routesPath });
+  const input = { payload: { value: 'original' } };
+  const pending = sdk.execute({ object: 'provider', verb: 'evaluate', subject: 'custom/exact', input });
+  input.payload.value = 'changed';
+  const receipt = await pending;
+  assert.equal(runtime.calls[1].capabilityId, 'evaluate-exact');
+  assert.equal(runtime.calls[1].input.payload.value, 'original');
+  await sdk.execute({ object: 'capability', verb: 'evaluate', subject: 'observe-example', input: {} });
+  assert.equal(runtime.calls.at(-1).capabilityId, 'evaluate-capability');
+  await sdk.execute({ object: 'provider', verb: 'evaluate', subject: 'custom/fallback', input: {} });
+  assert.equal(runtime.calls.at(-1).capabilityId, 'evaluate-provider');
+  await assert.rejects(sdk.execute({ object: 'profile', verb: 'evaluate', subject: 'profile-example', input: {} }),
+    error => error.code === 'CAPABILITY_ROUTE_REQUIRED');
+  await assert.rejects(sdk.execute({ verb: 'evaluate', subject: 'custom/exact', input: {} }),
+    error => error.code === 'ROUTE_OBJECT_REQUIRED');
+  assert.deepEqual((await sdk.execute({ object: 'execution', verb: 'compare', subject: receipt.executionId,
+    other: receipt.executionId })).changes, []);
+  routes[1].capsuleDigest = `sha256:${'b'.repeat(64)}`;
+  await save();
+  const invoked = runtime.calls.filter(call => call.operation === 'invoke').length;
+  await assert.rejects(sdk.execute({ object: 'provider', verb: 'evaluate', subject: 'custom/exact', input: {} }),
+    error => error.code === 'ROUTE_STALE');
+  assert.equal(runtime.calls.filter(call => call.operation === 'invoke').length, invoked);
+  routes.push({ ...routes[0] });
+  await save();
+  await assert.rejects(sdk.execute({ object: 'provider', verb: 'evaluate', subject: 'custom/fallback', input: {} }),
+    error => error.code === 'ROUTES_REJECTED');
+  await writeFile(routesPath, JSON.stringify({ routesType: 'sfx-surface-routes.v1', routes: [{
+    verb: 'evaluate', subject: '*', capabilityId: 'legacy-evaluator', capsuleDigest: pin,
+  }] }));
+  await assert.rejects(sdk.execute({ object: 'provider', verb: 'evaluate', subject: 'custom/fallback', input: {} }),
+    error => error.code === 'ROUTE_OBJECT_REQUIRED');
+});
+
 test('structural comparison preserves JSON pointer escaping and does not claim semantic equivalence', () => {
   assert.deepEqual(structuralDiff({ 'a/b': 1, gone: true }, { 'a/b': 2, added: false }), [
     { path: '/a~1b', kind: 'changed', before: 1, after: 2 },
