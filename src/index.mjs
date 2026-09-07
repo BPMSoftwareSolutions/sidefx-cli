@@ -67,7 +67,9 @@ class Sidefx {
 
     requireValue(result && typeof result === 'object', 'DELIVERY_PROTOCOL_REJECTED',
       'The estate returned no canonical result.', 4);
-    if (result.disposition !== 'completed') {
+    // A terminal scenario outcome is a completed delivery. Only a runtime failure is an
+    // sfx failure; a domain rejection is carried through and exits 0, for the caller to read.
+    if (!['terminated', 'completed'].includes(result.disposition)) {
       throw new SidefxError(result.errorCode ?? 'ESTATE_OPERATION_FAILED',
         result.errorCode ?? `The estate returned disposition ${result.disposition}.`, 4,
         { capabilityId: surface.capabilityId, operation: spec.wraps.operation, result });
