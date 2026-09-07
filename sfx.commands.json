@@ -1,0 +1,643 @@
+{
+  "mappingType": "sfx-command-mapping.v1",
+  "note": "sfx owns the developer-facing vocabulary (docs/intent.md). The estate owns every operation behind it. Each command either wraps a declared estate operation or is recorded MISSING with what the estate must offer. Nothing here describes capsule layout, plan formats, provider inventory, or authoring language.",
+  "surfaces": {
+    "capsule-estate-cli": {
+      "capabilityId": "deliver-capsule-estate-cli",
+      "request": "capsule-estate-cli-delivery-request.v2",
+      "rootRefField": "repositoryRootRef",
+      "operations": [
+        "verify",
+        "resolve",
+        "list",
+        "inspect",
+        "invoke",
+        "expand",
+        "project",
+        "test",
+        "direct",
+        "prove-direct-execution",
+        "proof",
+        "sterile-proof"
+      ]
+    },
+    "capability-change-cli": {
+      "capabilityId": "deliver-capability-change-cli",
+      "request": "capability-change-operation-request.v1",
+      "operations": [
+        "open",
+        "seal",
+        "publish",
+        "status"
+      ]
+    },
+    "token-provisioning-cli": {
+      "capabilityId": "deliver-capability-token-provisioning-cli",
+      "operations": [
+        "provision"
+      ]
+    }
+  },
+  "identities": {
+    "capability": {
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "message": "Use an exact capability identity."
+    },
+    "provider": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "message": "Use the exact provider identity declared by the estate."
+    },
+    "execution": {
+      "pattern": "^exec-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "message": "Use a retained execution identity."
+    }
+  },
+  "commands": {
+    "estate": {
+      "verify": {
+        "min": 0,
+        "max": 0,
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "verify"
+        },
+        "description": "Verify estate integrity and layout"
+      },
+      "inspect": {
+        "min": 0,
+        "max": 0,
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "verify"
+        },
+        "description": "Verify estate integrity and layout"
+      }
+    },
+    "capability": {
+      "list": {
+        "min": 0,
+        "max": 0,
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "list"
+        },
+        "description": "List estate capabilities"
+      },
+      "search": {
+        "min": 0,
+        "max": null,
+        "query": true,
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "list",
+          "fields": {
+            "query": "$query"
+          }
+        },
+        "description": "Search estate capabilities"
+      },
+      "find": {
+        "min": 1,
+        "max": null,
+        "query": true,
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "list",
+          "fields": {
+            "query": "$query"
+          }
+        },
+        "description": "Search estate capabilities by required query"
+      },
+      "inspect": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "inspect",
+          "fields": {
+            "capabilityId": "$subject"
+          }
+        },
+        "description": "Inspect one capability"
+      },
+      "resolve": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "resolve",
+          "fields": {
+            "capabilityId": "$subject"
+          }
+        },
+        "description": "Resolve the declared dependency closure"
+      },
+      "invoke": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "input": true,
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "invoke",
+          "fields": {
+            "capabilityId": "$subject",
+            "capabilityInput": "$input"
+          }
+        },
+        "description": "Invoke a capability with canonical input"
+      },
+      "evaluate": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "direct",
+          "fields": {
+            "capabilityIds": [
+              "$subject"
+            ]
+          }
+        },
+        "description": "Prove direct execution against admitted fixtures"
+      },
+      "scenarios": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate operation returning declared scenario identities for one capability",
+          "todaySfxDoes": "decodes the capsule plan and Gherkin itself in src/projection.mjs"
+        },
+        "description": "List declared scenarios"
+      },
+      "reveal": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "view": true,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate representation operation returning scenario, blueprint, feature and contract views",
+          "todaySfxDoes": "decodes capability.authority.json, blueprint.authority.json, plan cells and @scenario/@input/@event/@outcome tags in src/projection.mjs"
+        },
+        "description": "Reveal scenario, blueprint, feature or contract views"
+      },
+      "providers": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate operation returning bound mechanics and eligible providers for one capability",
+          "todaySfxDoes": "reads realizationOverlay/mechanicBindings out of the capsule plan"
+        },
+        "description": "Show bound mechanics and provider candidates"
+      },
+      "compare": {
+        "min": 2,
+        "max": 2,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate comparison operation, or a representation operation whose results sfx can diff without capsule knowledge"
+        },
+        "description": "Structurally compare two capabilities"
+      },
+      "author": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "an authoring operation on a CLI delivery surface"
+        }
+      },
+      "admit": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "an admission operation on a CLI delivery surface"
+        }
+      },
+      "install": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "an installation operation on a CLI delivery surface"
+        }
+      },
+      "publish": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "publish is declared on capability-change-cli against a governed change context, not a bare capability identity; the operand shape must be settled"
+        }
+      },
+      "govern": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "a governance operation on a CLI delivery surface"
+        }
+      }
+    },
+    "capsule": {
+      "list": {
+        "min": 0,
+        "max": 0,
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "list"
+        },
+        "description": "List capabilities carrying an estate capsule"
+      },
+      "inspect": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "inspect",
+          "fields": {
+            "capabilityId": "$subject"
+          }
+        },
+        "description": "Inspect the current capsule by capability identity"
+      },
+      "evaluate": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "wraps": {
+          "surface": "capsule-estate-cli",
+          "operation": "direct",
+          "fields": {
+            "capabilityIds": [
+              "$subject"
+            ]
+          }
+        },
+        "description": "Prove direct execution against admitted fixtures"
+      },
+      "reveal": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "view": true,
+        "status": "MISSING",
+        "missing": {
+          "need": "the same representation operation capability reveal needs"
+        }
+      },
+      "compare": {
+        "min": 2,
+        "max": 2,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "the same comparison operation capability compare needs"
+        }
+      },
+      "admit": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "a capsule admission operation on a CLI delivery surface"
+        }
+      },
+      "publish": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "a capsule publication operation on a CLI delivery surface"
+        }
+      }
+    },
+    "scenario": {
+      "list": {
+        "min": 1,
+        "max": 1,
+        "identity": "capability",
+        "status": "MISSING",
+        "missing": {
+          "need": "the scenario representation operation capability scenarios needs"
+        }
+      },
+      "inspect": {
+        "min": 2,
+        "max": 2,
+        "identity": "capability",
+        "scenarioOperand": true,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate operation selecting one scenario of one capability"
+        }
+      },
+      "reveal": {
+        "min": 2,
+        "max": 2,
+        "identity": "capability",
+        "scenarioOperand": true,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate operation revealing one scenario of one capability"
+        }
+      }
+    },
+    "provider": {
+      "list": {
+        "min": 0,
+        "max": 0,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider inventory operation",
+          "todaySfxDoes": "reads a local --catalog JSON file and local reference registrations"
+        }
+      },
+      "search": {
+        "min": 0,
+        "max": null,
+        "query": true,
+        "namespace": true,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider discovery operation",
+          "todaySfxDoes": "substring-filters the local catalog file"
+        }
+      },
+      "find": {
+        "min": 1,
+        "max": null,
+        "query": true,
+        "namespace": true,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider discovery operation"
+        }
+      },
+      "inspect": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider observation operation",
+          "todaySfxDoes": "returns a local catalog row as DISCOVERY_TESTIMONY"
+        }
+      },
+      "compare": {
+        "min": 2,
+        "max": 2,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider comparison operation"
+        }
+      },
+      "add": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate operation registering a provider reference",
+          "todaySfxDoes": "writes a JSON file under the local state root"
+        }
+      },
+      "remove": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate operation removing a provider reference",
+          "todaySfxDoes": "deletes a JSON file under the local state root"
+        }
+      },
+      "discover": {
+        "min": 1,
+        "max": 1,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate source discovery operation"
+        }
+      },
+      "evaluate": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "a CLI delivery operation over the estate's governed remote-exchange capabilities",
+          "candidate": "observe-governed-http-exchange, observe-remote-api-operation-exchange",
+          "todaySfxDoes": "runs its own bounded HTTP worker in packages/http-provider through a process runtime"
+        }
+      },
+      "admit": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "a provider admission operation on a CLI delivery surface"
+        }
+      },
+      "assimilate": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "a provider assimilation operation on a CLI delivery surface",
+          "candidate": "compile-rapidapi-provider-candidates, compile-remote-api-operation-descriptor"
+        }
+      },
+      "configure": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "a provider configuration operation on a CLI delivery surface"
+        }
+      },
+      "publish": {
+        "min": 1,
+        "max": 1,
+        "identity": "provider",
+        "status": "MISSING",
+        "missing": {
+          "need": "a provider publication operation on a CLI delivery surface"
+        }
+      }
+    },
+    "execution": {
+      "list": {
+        "min": 0,
+        "max": 0,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate execution-evidence index",
+          "todaySfxDoes": "lists local delivery receipts under the state root"
+        }
+      },
+      "inspect": {
+        "min": 1,
+        "max": 1,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate execution-evidence read operation",
+          "todaySfxDoes": "reads a local delivery receipt"
+        }
+      },
+      "observe": {
+        "min": 1,
+        "max": 1,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate execution-evidence read operation",
+          "todaySfxDoes": "reads a local delivery receipt"
+        }
+      },
+      "explain": {
+        "min": 1,
+        "max": 1,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "the capability-debugger operation described in docs/intent.md, as an estate capability",
+          "todaySfxDoes": "reshapes a local delivery receipt"
+        }
+      },
+      "compare": {
+        "min": 2,
+        "max": 2,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate evidence comparison operation"
+        }
+      }
+    },
+    "evidence": {
+      "list": {
+        "min": 0,
+        "max": 0,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate evidence index; the local receipt view is delivery testimony only"
+        }
+      },
+      "inspect": {
+        "min": 1,
+        "max": 1,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate evidence read operation"
+        }
+      },
+      "observe": {
+        "min": 1,
+        "max": 1,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate evidence read operation"
+        }
+      },
+      "explain": {
+        "min": 1,
+        "max": 1,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "the same capability-debugger operation execution explain needs"
+        }
+      },
+      "compare": {
+        "min": 2,
+        "max": 2,
+        "identity": "execution",
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate evidence comparison operation"
+        }
+      }
+    },
+    "profile": {
+      "list": {
+        "min": 0,
+        "max": 0,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider-profile inventory operation"
+        }
+      },
+      "search": {
+        "min": 0,
+        "max": null,
+        "query": true,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider-profile search operation"
+        }
+      },
+      "inspect": {
+        "min": 1,
+        "max": 1,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider-profile read operation"
+        }
+      },
+      "resolve": {
+        "min": 1,
+        "max": 1,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider-eligibility resolution operation",
+          "candidate": "resolve-sidefx-eligible-providers"
+        }
+      },
+      "evaluate": {
+        "min": 1,
+        "max": 1,
+        "status": "MISSING",
+        "missing": {
+          "need": "an estate provider-profile evaluation operation"
+        }
+      }
+    }
+  },
+  "unmappedEstateOperations": {
+    "note": "Declared by capsule-estate-cli but not currently surfaced by any sfx command. Listed so the choice to expose them is deliberate.",
+    "operations": [
+      "expand",
+      "project",
+      "proof",
+      "sterile-proof",
+      "test"
+    ]
+  }
+}

@@ -4,142 +4,78 @@ import { createSidefx } from './index.mjs';
 import { readJson } from './data.mjs';
 import { requireValue, SidefxError, errorRecord } from './errors.mjs';
 import { render } from './render.mjs';
-import { isSemanticObject, parseSemanticCommand, validateSemanticRequest } from './commands.mjs';
+import { parseSemanticCommand, validateSemanticRequest } from './commands.mjs';
 import { loadConfiguration } from './configuration.mjs';
 
+// Terminal-owned help. The command list comes from the loaded mapping, never from here.
 export const help = `SideFX terminal — sfx
-Speak the SideFX capability model: sfx <object> <operation> [identity].
-Entity Neutrality: types select operations; identities and domain values are data.
-
-  sfx provider list
-  sfx provider search [query] [--namespace NAME]
-  sfx provider inspect|add|remove <namespace/provider>
-  sfx provider compare <provider> <provider>
-  sfx capability list
-  sfx capability search [query]
-  sfx capability find <query>
-  sfx capability inspect|providers|scenarios|resolve|evaluate <capability>
-  sfx capability invoke <capability> --input @request.json
-  sfx capability compare <capability> <capability>
-  sfx capability reveal <capability> [--scenario ID] [--as VIEW]
-  sfx scenario list <capability>
-  sfx scenario inspect|reveal <capability> <scenario>
-  sfx capsule list
-  sfx capsule inspect|evaluate <capability>
-  sfx capsule reveal <capability> [--scenario ID] [--as VIEW]
-  sfx capsule compare <capability> <capability>
-  sfx execution list
-  sfx execution inspect|observe|explain <execution-id>
-  sfx execution compare <execution-id> <execution-id>
-  sfx estate inspect|verify
-  sfx evidence list
-  sfx evidence inspect|observe|explain <execution-id>
-  sfx evidence compare <execution-id> <execution-id>
-
-Executable operations require an explicit capability binding and canonical input:
-  sfx provider discover <source>
-  sfx provider evaluate|admit|assimilate|configure|publish <provider>
-  sfx capability author|admit|install|publish|govern <capability>
-  sfx capsule admit|publish <capability>
-  sfx profile list
-  sfx profile search [query]
-  sfx profile inspect|resolve|evaluate <profile>
-      --via <capability-id> --input @request.json
-  Provider search/inspect, capability resolve/evaluate, capsule evaluate and
-  provider/capability/capsule compare can also delegate with --via and --input.
-  Use --routes FILE for bindings pinned to capsule digests (v2) or authority (v3).
-  Entity metadata declares operation bindings; providers receive command and input.
-  Project defaults apply only to matching routes; provider authority validates input.
-
-Compatibility: existing verb-first forms remain, including sfx invoke, inspect,
-  find, search, reveal, evaluate, observe, explain, compare, list and verify.
+The command surface for the Managed Capability Estate: sfx <object> <operation> [identity].
+sfx owns argument and stream carriers. Every operation belongs to the selected estate.
 
 Options:
-  --config FILE       Configuration (default: selected estate, otherwise current directory)
-  --estate PATH       Estate with its installed sda-bootstrap (or SIDEFX_ESTATE)
-  --state PATH        Local receipts and provider references (or SIDEFX_HOME)
-  --catalog FILE      Provider discovery catalog; repeat for multiple files
-  --namespace NAME    Optional namespace filter for local provider search
-  --routes FILE       Explicit verb-to-capability bindings
+  --config FILE      This project's sfx.config.json (default: ./sfx.config.json)
+  --estate PATH      Estate with its installed sda-bootstrap (or SIDEFX_ESTATE)
   --input VALUE      Canonical JSON, @file.json, or - for standard input
-  --as VIEW          scenario, blueprint, feature, or contracts for reveal
-  --scenario ID      Select a scenario for reveal
+  --as VIEW          Selectable view, where the operation declares one
+  --scenario ID      Select a scenario
+  --namespace NAME   Namespace filter, where the operation declares one
   --json             Machine-readable JSON; diagnostics remain on stderr
-  --timeout MS       Runtime timeout in milliseconds (default 120000)
+  --timeout MS       Delivery timeout in milliseconds (default 120000)
   --help, -h         Show this help
   --version          Show the version
 
-capability evaluate runs existing fixtures. Provider evaluation and admission
-require capability bindings. Catalogs and registered references confer no admission.
-Entity-specific configuration belongs in canonical data, never instance-specific flags.
 Exit 0 means delivery completed; inspect the returned domain disposition.
-Exit 2: usage/input. Exit 3: unavailable boundary. Exit 4: runtime/integrity.
+Exit 2: usage/input. Exit 3: not offered by the estate. Exit 4: delivery/integrity.
 `;
 
-function parseOptions(argv) {
-  let parsed;
-  try {
-    parsed = parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
-      config: { type: 'string' }, estate: { type: 'string' }, state: { type: 'string' }, catalog: { type: 'string', multiple: true },
-      routes: { type: 'string' }, input: { type: 'string' }, via: { type: 'string' },
-      as: { type: 'string' }, scenario: { type: 'string' }, timeout: { type: 'string' },
-      namespace: { type: 'string' },
-      json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' },
-    } });
-  } catch (error) { throw new SidefxError('USAGE_ERROR', error.message, 2); }
-  return parsed;
+function operandHint(spec) {
+  if (spec.query) return spec.min ? ' <query>' : ' [query]';
+  if (spec.scenarioOperand) return ' <identity> <scenario>';
+  if (spec.max === 2) return ' <identity> <identity>';
+  return spec.min ? ' <identity>' : '';
 }
 
-export function parseCommand(argv, vocabulary) {
-  const parsed = parseOptions(argv);
-  const { values, positionals } = parsed;
+export function mappingHelp(mapping) {
+  const offered = [];
+  const missing = [];
+  for (const [object, operations] of Object.entries(mapping.commands)) {
+    for (const [verb, spec] of Object.entries(operations)) {
+      const line = `  sfx ${object} ${verb}${operandHint(spec)}`;
+      if (spec.offered) offered.push(`${line}${spec.description ? `\n      ${spec.description}` : ''}`);
+      else missing.push(`  sfx ${object} ${verb}  —  ${spec.missing.need}`);
+    }
+  }
+  return `${help}
+Offered by the selected estate (${offered.length}):
+${offered.join('\n')}
+
+Not yet offered by the estate (${missing.length}):
+${missing.join('\n')}
+`;
+}
+
+function parseOptions(argv) {
+  try {
+    return parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
+      config: { type: 'string' }, estate: { type: 'string' }, input: { type: 'string' },
+      as: { type: 'string' }, scenario: { type: 'string' }, namespace: { type: 'string' },
+      timeout: { type: 'string' }, json: { type: 'boolean' },
+      help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' },
+    } });
+  } catch (error) { throw new SidefxError('USAGE_ERROR', error.message, 2); }
+}
+
+export function parseCommand(argv, mapping) {
+  const { values, positionals } = parseOptions(argv);
   if (values.help || values.version || positionals.length === 0) return { values, help: !values.version, version: values.version };
   if (values.timeout !== undefined) requireValue(/^\d+$/.test(values.timeout) && Number(values.timeout) > 0
     && Number(values.timeout) <= 2_147_483_647, 'INVALID_TIMEOUT', '--timeout must be a positive integer below 2147483648.', 2);
-  if (isSemanticObject(positionals[0], vocabulary)) {
-    const request = { ...parseSemanticCommand(positionals, vocabulary), as: values.as, via: values.via, namespace: values.namespace };
-    requireValue(values.scenario === undefined || request.scenario === undefined,
-      'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
-    if (values.scenario !== undefined) request.scenario = values.scenario;
-    const spec = validateSemanticRequest({ ...request, input: values.input }, { routes: Boolean(values.routes), vocabulary });
-    requireValue(!values.routes || spec.bindable, 'OPTION_NOT_APPLICABLE', '--routes requires a delegated operation.', 2);
-    return { values, request };
-  }
-  requireValue(values.namespace === undefined, 'OPTION_NOT_APPLICABLE', '--namespace applies to provider search.', 2);
-  const [verb, ...operands] = positionals;
-  const request = { verb };
-  const arity = (min, max = min) => requireValue(operands.length >= min && operands.length <= max,
-    'USAGE_ERROR', `Wrong operands for sfx ${verb}. Run sfx --help.`, 2);
-  switch (verb) {
-    case 'list': arity(0, 1); request.subject = operands[0] ?? 'capabilities'; break;
-    case 'find': arity(1, Infinity); request.subject = operands.join(' '); break;
-    case 'search': arity(2, Infinity); request.subject = operands[0]; request.query = operands.slice(1).join(' '); break;
-    case 'compare': arity(2); [request.subject, request.other] = operands; break;
-    case 'provider':
-      request.action = operands[0];
-      arity(request.action === 'list' ? 1 : 2);
-      request.subject = operands[1];
-      break;
-    case 'verify': arity(0); break;
-    case 'evaluate':
-      if (operands[0] === 'provider') { arity(2); request.subject = operands[1]; request.provider = true; }
-      else { arity(1); request.subject = operands[0]; }
-      break;
-    case 'inspect': case 'reveal': case 'scenarios': case 'providers': case 'resolve':
-    case 'invoke': case 'observe': case 'explain': case 'assimilate': case 'author':
-    case 'install': case 'publish': case 'govern':
-      arity(1); request.subject = operands[0]; break;
-    default: throw new SidefxError('COMMAND_REJECTED', `Unknown command ${verb}. Run sfx --help.`, 2);
-  }
-  requireValue(!(values.as || values.scenario) || verb === 'reveal',
-    'OPTION_NOT_APPLICABLE', '--as and --scenario apply to reveal.', 2);
-  requireValue(!values.via || ['evaluate', 'assimilate', 'author', 'resolve', 'install', 'publish', 'govern', 'compare'].includes(verb),
-    'OPTION_NOT_APPLICABLE', '--via requires a delegated action.', 2);
-  requireValue(values.input === undefined || ['invoke', 'evaluate', 'assimilate', 'author', 'resolve', 'install', 'publish', 'govern', 'compare'].includes(verb),
-    'OPTION_NOT_APPLICABLE', '--input applies only to capability execution.', 2);
-  requireValue(!values.routes || ['evaluate', 'assimilate', 'author', 'resolve', 'install', 'publish', 'govern', 'compare'].includes(verb),
-    'OPTION_NOT_APPLICABLE', '--routes applies only to delegated actions.', 2);
-  return { values, request: { ...request, as: values.as, scenario: values.scenario, via: values.via } };
+  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, namespace: values.namespace };
+  requireValue(values.scenario === undefined || request.scenario === undefined,
+    'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
+  if (values.scenario !== undefined) request.scenario = values.scenario;
+  validateSemanticRequest({ ...request, input: values.input }, mapping);
+  return { values, request };
 }
 
 async function readInput(value, stdin) {
@@ -155,7 +91,7 @@ async function readInput(value, stdin) {
     }
     value = Buffer.concat(chunks).toString('utf8');
   }
-  try { return JSON.parse(value.replace(/^\uFEFF/, '')); } catch (error) {
+  try { return JSON.parse(value.replace(/^﻿/, '')); } catch (error) {
     throw new SidefxError('INPUT_JSON_REJECTED', `Input must be valid JSON: ${error.message}`, 2);
   }
 }
@@ -164,29 +100,27 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
   let json = argv.includes('--json');
   try {
     const preliminary = parseOptions(argv);
-    const selectedEstate = preliminary.values.estate ?? process.env.SIDEFX_ESTATE;
-    const configuration = preliminary.values.version ? {} : await loadConfiguration(preliminary.values.config, process.cwd(), { estateRoot: selectedEstate });
-    const vocabulary = configuration.commandSurface?.vocabulary;
-    const parsed = parseCommand(argv, vocabulary);
-    json = parsed.values.json;
-    if (parsed.version) {
+    if (preliminary.values.version) {
       const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-      stdout.write(json ? `${JSON.stringify({ name: 'sfx', version })}\n` : `sfx ${version}\n`);
+      stdout.write(preliminary.values.json ? `${JSON.stringify({ name: 'sfx', version })}\n` : `sfx ${version}\n`);
       return 0;
     }
+    const selectedEstate = preliminary.values.estate ?? process.env.SIDEFX_ESTATE;
+    const configuration = await loadConfiguration(preliminary.values.config, process.cwd());
+    const { mapping } = configuration;
+    const parsed = parseCommand(argv, mapping);
+    json = parsed.values.json;
     if (parsed.help) {
-      const declared = Object.entries(vocabulary ?? {}).flatMap(([object, operations]) => Object.entries(operations)
-        .filter(([, spec]) => spec.declared).map(([verb, spec]) => `  sfx ${object} ${verb}${spec.query ? ' [query]' : spec.min ? ' <identity>' : ''}`));
-      const content = help + (declared.length ? `\nEstate-declared commands:\n${declared.join('\n')}\n` : '');
-      stdout.write(json ? `${JSON.stringify({ command: 'sfx', help: content })}\n` : content); return 0;
+      const content = mappingHelp(mapping);
+      stdout.write(json ? `${JSON.stringify({ command: 'sfx', help: content })}\n` : content);
+      return 0;
     }
     const { values, request } = parsed;
     request.input = await readInput(values.input, stdin);
-    const sidefx = factory({ ...configuration, estateRoot: selectedEstate || configuration.estateRoot, stateRoot: values.state,
-      catalogPaths: values.catalog ?? configuration.catalogPaths, routesPath: values.routes,
+    const sidefx = factory({ mapping, estateRoot: selectedEstate || configuration.estateRoot,
       timeoutMs: values.timeout === undefined ? undefined : Number(values.timeout) });
     const result = await sidefx.execute(request);
-    stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result, vocabulary)}\n`);
+    stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result, mapping)}\n`);
     return 0;
   } catch (error) {
     if (error.code === 'EPIPE') return 0;

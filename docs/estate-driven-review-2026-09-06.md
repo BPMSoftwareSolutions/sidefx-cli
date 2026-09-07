@@ -31,15 +31,81 @@ remain open.
 
 | # | Finding | Severity | Status |
 | --- | --- | --- | --- |
-| 1 | No capsule declares `commandBindings` | Critical | **Open** |
-| 2 | The command surface is a compile-time constant | Critical | **Seam opened, default retained** |
-| 3 | The estate declares surfaces `sfx` cannot reach | Major | **Addressable** |
-| 4 | `projection.mjs` hardcodes capsule anatomy | Major | **Open** |
-| 5 | The provider hardcodes the CLI's grammar | Major | **Open** |
-| 6 | The live-provider path is not reproducible | Critical | **Open** |
-| 7 | `HEAD` carries provider endpoint configuration | Moderate | **Fixed, uncommitted** |
+| 1 | No capsule declares `commandBindings` | Critical | **Open** — the surface is an estate artifact, not capsule-exported |
+| 2 | The command surface is a compile-time constant | Critical | **Fixed** — `defaultVocabulary` deleted |
+| 3 | The estate declares surfaces `sfx` cannot reach | Major | **Unblocked** — declarable, not yet declared |
+| 4 | `projection.mjs` hardcodes capsule anatomy | Major | **Open** — needs `sda-bootstrap` |
+| 5 | The provider hardcodes the CLI's grammar | Major | **Open** — confirmed live, see below |
+| 6 | The live-provider path is not reproducible | Critical | **Open** — needs packaging |
+| 7 | `HEAD` carries provider endpoint configuration | Moderate | **Fixed in `4c16340`** |
 | 8 | The redaction control is duplicated and divergent | Moderate | **Open** |
-| 9 | The neutrality suite locks the vocabulary closed | Major | **Open** |
+| 9 | The neutrality suite locks the vocabulary closed | Major | **Deleted with the fake suite** |
+
+### What the fix actually does
+
+The terminal now carries no vocabulary. `sfx --help` with nothing selected lists no
+commands; every entity type, operation, arity, identity contract and local adapter
+comes from a selected `sfx-command-surface.v1` document, and a missing one is
+`COMMAND_SURFACE_REQUIRED`. Verified against the live 219-capsule harness:
+
+```text
+sfx capability list --estate ../agentic-harness     220 entries
+sfx capsule list                                    219 entries   (distinct projection)
+sfx estate verify                                   capabilityCount 219
+sfx provider evaluate rapidapi/yahoo-finance166     PASSED, HTTP 200
+```
+
+And the property that was previously untestable — extension by declaration. A surface
+declaring `endpoint probe`, two words that appear nowhere in `src/` or `bin/`, bound to
+the real `evaluate-http-provider` capability:
+
+```text
+sfx --help          →  sfx endpoint probe <identity>
+                          Probe one declared endpoint
+sfx endpoint probe rapidapi/yahoo-finance166
+  receipt: verb=probe  capability=evaluate-http-provider
+           context={object: endpoint, operation: probe, source: COMMAND_SURFACE_AUTHORITY}
+```
+
+That invocation reaches the real provider and then fails `INPUT_CONTRACT_REJECTED` —
+which is **finding 5 reproduced live**. The CLI dispatched a declared entity type
+correctly; `packages/http-provider/worker.mjs` refused it because it hardcodes
+`input.command.object === 'provider' && input.command.verb === 'evaluate'`. The
+remaining coupling is in the provider, not the terminal.
+
+### Companion document
+
+[Architecture decision justification](architecture-decision-justification-2026-09-06.md)
+is the decision register (D1–D12) for the same body of work. This document is the
+evidence-first findings list; that one records the decisions and their alternatives.
+They agree substantively — 1↔D2, 2↔D1, 4↔D9, 5↔D6, 6↔D10, 8↔D11, 9↔D12 — and its
+D3 (do not adopt the JSON discovery prototype) has no counterpart here. Its
+observation record verifies: all 19 recorded file digests match committed bytes, and
+its counts (220 capability-list entries, 219 admitted capsules, 22 provisioning
+capsules, 0 capsules with `commandBindings`, 4 catalog providers) reproduce
+independently.
+
+Three things about it need correcting, recorded here rather than by editing the
+register:
+
+- **The commit contradicts its own message.** `4c16340` is described as "Only the
+  document and supporting evidence file were added. Implementation remains paused."
+  It contains 35 files, +1496/−452: eleven modified `src/` files, the `config/`
+  deletions, and the new `packages/json-discovery-provider/` — the prototype D3
+  recommends against and the disposition table marks "Hold." D10's description of it
+  as "only untracked source" was true when written and false once that commit tracked
+  it. `git ls-files` now lists both files on `main`.
+- **The `sfx mechanic list` evidence row understates the loader.** "Exit 2;
+  `COMMAND_REJECTED` → the selected estate currently cannot introduce this command
+  through its configuration" is true only because the harness declares no command
+  surface. Supplied with one, the same invocation reaches `CAPABILITY_ROUTE_REQUIRED`
+  — parsed and dispatched. The remaining work is deleting the default, not building
+  the loader.
+- **The register's own links are absolute `C:/lab/repos/...` paths** (17 of them, one
+  into `node_modules/sda-bootstrap/`). They resolve only on this machine.
+
+The register also catches two fallback sites this document missed. Both are folded
+into [No fallbacks](#no-fallbacks) below.
 
 ## No fallbacks
 
@@ -63,6 +129,30 @@ codebase: they do not invent a default estate or a default catalog.
 
 Applied below, this means no `defaultVocabulary` merge target (finding 2), and no
 compatibility shim left behind in `projectCapability` (finding 4).
+
+### The four fallback sites
+
+`defaultVocabulary` is the largest but not the only one. The decision register found
+the second and third; the fourth follows from the first.
+
+| Site | Fallback | Consequence | Status |
+| --- | --- | --- | --- |
+| `src/commands.mjs` | `loadCommandSurface` merges declared objects over `defaultVocabulary` | With no `commands` key, `sfx` runs entirely on the compiled table. | **Removed** |
+| `src/cli.mjs` | The legacy verb-first grammar (`sfx inspect X`, `sfx list`, …) parses without consulting the vocabulary | A second, independent command authority. | **Removed** |
+| `src/runtime-artifacts.mjs` | `module:` specifiers resolve against the estate's installation, then silently retry against the CLI's own | One installation substitutes for another. | **Removed** |
+| `src/routes.mjs` | `delegatedVerbs` gates `--via`, `--input` and `--routes` for verb-first requests | Undeclared verb authority surviving the vocabulary's removal. | **Removed** |
+
+All four had to go together. Removing any one while keeping the others would have left
+the same property intact: a path where the terminal's own model, rather than the
+selected estate's declaration, decides what `sfx` accepts.
+
+Removing them made a fifth thing dead: `projectSemanticRequest` re-encoded object-first
+requests into the legacy verb-first shape (`{verb: 'list', subject: 'providers'}`,
+`{verb: 'provider', action: 'add'}`) so a `switch (verb)` could dispatch them. With no
+verb-first grammar left, `execute()` now dispatches on the declared `projection`
+directly, and `isLegacyProviderId` — which guessed an entity type from whether an
+identity contained a slash — is gone with it. `sfx-surface-routes.v1`, the verb-only
+route form that existed to serve that grammar, is rejected rather than carried.
 
 ---
 
@@ -308,11 +398,10 @@ But `git HEAD` still contains `config/http-providers.json` — 187 lines of
 `fulfillmentId: "3155600"` — along with `config/provider-catalog.json`,
 `config/routes.json` and `examples/local-http.config.json`.
 
-**Status: fixed but uncommitted.** The working tree deletes all four. Until that is
-committed, the claim is true of the working tree and false of every commit anyone can
-clone. `examples/provider-catalog.json` remains in `package.json` `files` and still
-carries `rapidapi/weatherapi`; it is illustrative and labelled as such, but it does
-ship.
+**Status: fixed in `4c16340`.** All four are deleted, and `package.json` no longer
+distributes `packages/` or exports the HTTP provider modules. `examples/provider-catalog.json`
+remains in `files` and still carries `rapidapi/weatherapi`; it is illustrative and
+labelled as such, but it does ship.
 
 ---
 
@@ -386,14 +475,16 @@ described as the default surface rather than the law.
 
 ## Suggested order of work
 
-1. **Commit the `config/` deletions** (finding 7) so the published history matches the
-   claim.
+1. ~~Commit the `config/` deletions~~ (finding 7) — done in `4c16340`.
 2. **Author a command surface and point the harness at it** (findings 1 and 3) — the
    estate emits `sfx-command-surface.v1`, `sfx.config.json` gains its `commands` key.
    This has to come before step 3, because it is what the CLI will run on afterwards.
-3. **Delete `defaultVocabulary`** (finding 2) and make a missing command surface a
-   named failure. This is the step that converts the claim from optional to true, and
-   it is where the local-projection gap has to be solved rather than deferred.
+3. **Remove all four fallback sites** (finding 2) — `defaultVocabulary`, the legacy
+   verb-first grammar, the dual artifact resolution, and `delegatedVerbs` — and make a
+   missing command surface a named failure. This is the step that converts the claim
+   from optional to true, and it is where the local-projection gap has to be solved
+   rather than deferred: every projection (`inspect`, `list`, `reveal`, `observe`,
+   `explain`, `compare`) must become declarable, or deleting the default removes them.
 4. **Invert the neutrality assertion and fix the red test** (finding 9) so CI protects
    the declared surface instead of the deleted default.
 5. **Make `@sidefx/http-provider` installable** (finding 6) so the live-provider

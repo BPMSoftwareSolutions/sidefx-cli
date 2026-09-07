@@ -1,128 +1,36 @@
-import os from 'node:os';
-import path from 'node:path';
-import { EstateRuntime } from './runtime.mjs';
-import { ReceiptStore, explainReceipt, isExecutionId } from './receipts.mjs';
-import { ProviderCatalog, isLegacyProviderId, isCapabilityId } from './catalog.mjs';
-import { projectCapability, revealCapability, structuralDiff } from './projection.mjs';
-import { delegatedVerbs, resolveRoute, resolveEntityOperation } from './routes.mjs';
 import { requireValue, SidefxError } from './errors.mjs';
 import { assertJson } from './data.mjs';
-import { validateSemanticRequest, projectSemanticRequest, semanticCommand } from './commands.mjs';
-import { ConfiguredRuntime } from './process-runtime.mjs';
+import { validateSemanticRequest } from './commands.mjs';
+import { deliver, repositoryRootRef } from './delivery.mjs';
 
 export { SidefxError } from './errors.mjs';
-export { EstateRuntime } from './runtime.mjs';
-export { ConfiguredRuntime } from './process-runtime.mjs';
+export { loadCommandMapping } from './commands.mjs';
 export { loadConfiguration } from './configuration.mjs';
 
 export function createSidefx(options = {}) {
   return new Sidefx(options);
 }
 
+// Resolve a declared field template against the caller's request. The mapping names the
+// estate's field; sfx only supplies the operand it already parsed.
+function resolveTemplate(template, request) {
+  if (Array.isArray(template)) return template.map(item => resolveTemplate(item, request));
+  if (typeof template !== 'string' || !template.startsWith('$')) return template;
+  switch (template) {
+    case '$subject': return request.subject;
+    case '$other': return request.other;
+    case '$query': return request.query;
+    case '$input': return request.input;
+    case '$scenario': return request.scenario;
+    default: throw new SidefxError('COMMAND_MAPPING_REJECTED', `Unknown field template ${template}.`, 2);
+  }
+}
+
 class Sidefx {
-  constructor(options) {
-    this.runtime = options.runtime ?? new EstateRuntime({
-      estateRoot: options.estateRoot ?? process.env.SIDEFX_ESTATE,
-      timeoutMs: options.timeoutMs,
-    });
-    if (!options.runtime && options.runtimePaths?.length) this.runtime = new ConfiguredRuntime({
-      runtimePaths: options.runtimePaths, estateRuntime: this.runtime, timeoutMs: options.timeoutMs,
-    });
-    const stateRoot = options.stateRoot ?? process.env.SIDEFX_HOME ?? path.join(os.homedir(), '.sidefx');
-    this.receipts = new ReceiptStore(stateRoot);
-    this.catalog = new ProviderCatalog({ catalogPaths: options.catalogPaths, stateRoot });
-    this.routesPath = options.routesPath;
-    this.defaultRoutesPath = options.defaultRoutesPath;
-    this.commandSurface = options.commandSurface;
-    this.vocabulary = options.commandSurface?.vocabulary;
-  }
-
-  representationRoute(request) {
-    const spec = semanticCommand(request.object, request.verb, this.vocabulary);
-    if (!spec?.binding) return null;
-    return { ...spec.binding, object: request.object, verb: request.verb, subject: request.subject,
-      source: 'COMMAND_SURFACE_AUTHORITY', commandSurfaceDigest: this.commandSurface.digest };
-  }
-
-  async represent(request, route) {
-    const execution = await this.delegate(request, route);
-    requireValue(execution.result && typeof execution.result === 'object' && !Array.isArray(execution.result),
-      'REPRESENTATION_REJECTED', 'The representation provider must return an object.', 4);
-    return { ...execution.result, representationEvidence: {
-      executionId: execution.executionId, receiptDigest: execution.receiptDigest,
-    } };
-  }
-
-  async inspectCapability(id) {
-    requireValue(isCapabilityId(id), 'CAPABILITY_ID_REJECTED', 'Use an exact hyphenated capability identity.', 2);
-    const response = await this.runtime.request('inspect', { capabilityId: id });
-    const capability = response.result.representationType === 'sfx-capability-representation.v1'
-      ? response.result.capability : projectCapability(response.result);
-    requireValue(capability.capabilityId === id, 'CAPABILITY_IDENTITY_CONFLICT', 'Runtime returned a different capability identity.', 4);
-    return { ...capability, estateManifestDigest: response.estateManifestDigest };
-  }
-
-  async inspect(id) {
-    return isLegacyProviderId(id) ? this.readEntity('provider', id) : this.inspectCapability(id);
-  }
-
-  async readEntity(object, id) {
-    const request = { object, verb: 'inspect', subject: id };
-    const route = await this.representationRoute(request);
-    if (route) return this.represent(request, route);
-    switch (object) {
-      case 'provider': return this.catalog.inspect(id);
-      case 'capability': return this.inspectCapability(id);
-      case 'capsule': {
-        const capability = await this.inspectCapability(id);
-        requireValue(capability.capsuleDigest, 'CAPSULE_UNAVAILABLE', 'The selected capability has no estate capsule.');
-        return capability;
-      }
-      case 'execution': case 'evidence': return this.receipts.read(id);
-      default: throw new SidefxError('ENTITY_REPRESENTATION_UNAVAILABLE', `No local representation for ${object}.`);
-    }
-  }
-
-  async invoke(capabilityId, input, { verb = 'invoke', subject = capabilityId, route = null, object, command } = {}) {
-    requireValue(input !== undefined || command, 'INPUT_REQUIRED', 'Supply canonical JSON with --input @file.json, --input JSON, or --input -.', 2);
-    if (input !== undefined) assertJson(input);
-    // Freeze the carrier before asynchronous inspection or receipt persistence.
-    if (input !== undefined) input = JSON.parse(JSON.stringify(input));
-    if (command) command = JSON.parse(JSON.stringify(command));
-    const capability = await this.inspectCapability(capabilityId);
-    if (route?.capsuleDigest) requireValue(route.capsuleDigest === capability.capsuleDigest,
-      'ROUTE_STALE', 'The route is bound to another capsule digest. Review and update its binding.');
-    if (route?.authorityDigest) requireValue(route.authorityDigest === capability.capabilityAuthorityDigest,
-      'ROUTE_STALE', 'The route is bound to another capability authority. Review and update its binding.');
-    const context = object === undefined ? route : { ...route, object, operation: verb };
-    return this.receipts.execute({ verb, subject, input, command, capability,
-      estateManifestDigest: capability.estateManifestDigest, context }, () => this.runtime.request('invoke', {
-      capabilityId, input, command, capsuleDigest: capability.capsuleDigest, estateManifestDigest: capability.estateManifestDigest,
-      ...(capability.runtimeManifestDigest ? { capabilityAuthorityDigest: capability.capabilityAuthorityDigest,
-        runtimeManifestDigest: capability.runtimeManifestDigest } : {}),
-    }));
-  }
-
-  async delegate(request, declaredRoute) {
-    const { object, verb, subject, via } = request;
-    let input = request.input;
-    if (input !== undefined) { assertJson(input); input = JSON.parse(JSON.stringify(input)); }
-    let route;
-    if (declaredRoute) route = declaredRoute;
-    else if (via) route = { capabilityId: via, source: 'EXPLICIT_INVOCATION' };
-    else if (this.routesPath) route = await resolveRoute(this.routesPath, verb, subject, object, this.vocabulary);
-    else {
-      if (object && subject) {
-        try { route = resolveEntityOperation(await this.readEntity(object, subject), request, this.vocabulary); }
-        catch (error) {
-          if (!['PROVIDER_NOT_FOUND', 'CAPSULE_NOT_FOUND', 'ENTITY_NOT_FOUND', 'ENTITY_REPRESENTATION_UNAVAILABLE'].includes(error.code)) throw error;
-        }
-      }
-      if (!route) route = this.representationRoute(request);
-      if (!route) route = await resolveRoute(this.defaultRoutesPath, verb, subject, object, this.vocabulary);
-    }
-    const context = object ? { ...route, object, operation: verb } : route;
-    return this.invoke(route.capabilityId, input, { verb, subject: subject ?? '*', route: context, command: request });
+  constructor({ mapping, estateRoot, timeoutMs } = {}) {
+    this.mapping = mapping;
+    this.estateRoot = estateRoot ?? process.env.SIDEFX_ESTATE;
+    this.timeoutMs = timeoutMs;
   }
 
   async execute(request) {
@@ -131,109 +39,39 @@ class Sidefx {
       assertJson(request.input);
       request.input = JSON.parse(JSON.stringify(request.input));
     }
-    const object = request.object;
-    let selectedEntity;
-    if (object !== undefined) {
-      const spec = validateSemanticRequest(request, { routes: Boolean(this.routesPath), vocabulary: this.vocabulary });
-      if (!request.via && !this.routesPath && request.input === undefined) {
-        const representation = await this.representationRoute(request);
-        if (representation) return spec.result === 'representation'
-          ? this.represent(request, representation) : this.delegate(request, representation);
-      }
-      if (spec.bindable && spec.projection && request.subject && !request.via && !this.routesPath) {
-        selectedEntity = await this.readEntity(object, request.subject);
-        const declaredRoute = resolveEntityOperation(selectedEntity, request, this.vocabulary);
-        if (declaredRoute) return this.delegate(request, declaredRoute);
-      }
-      let configuredRoute = false;
-      if (spec.bindable && this.defaultRoutesPath && !this.routesPath && !request.via) {
-        try { await resolveRoute(this.defaultRoutesPath, request.verb, request.subject, object, this.vocabulary); configuredRoute = true; }
-        catch (error) { if (error.code !== 'CAPABILITY_ROUTE_REQUIRED') throw error; }
-      }
-      if (!spec.projection || (spec.bindable && (request.via || this.routesPath || configuredRoute || request.input !== undefined))) {
-        return this.delegate(request);
-      }
-      request = projectSemanticRequest(request, this.vocabulary);
+    const spec = validateSemanticRequest(request, this.mapping);
+
+    // A command the estate does not yet offer fails as exactly that. sfx never
+    // substitutes a local implementation for a missing estate operation.
+    if (!spec.offered) {
+      throw new SidefxError('COMMAND_NOT_OFFERED',
+        `sfx ${request.object} ${request.verb} is not yet offered by the selected estate. Needed: ${spec.missing.need}`,
+        3, { object: request.object, verb: request.verb, ...spec.missing });
     }
-    const { verb, subject } = request;
-    if (request.via || (request.input !== undefined && delegatedVerbs.includes(verb))) {
-      requireValue(delegatedVerbs.includes(verb), 'OPTION_NOT_APPLICABLE', '--via only applies to delegated capability verbs.', 2);
-      return this.delegate(request);
+
+    const surface = this.mapping.surfaces[spec.wraps.surface];
+    const payload = { command: spec.wraps.operation };
+    if (surface.rootRefField) payload[surface.rootRefField] = repositoryRootRef(this.estateRoot ?? '.');
+    for (const [field, template] of Object.entries(spec.wraps.fields ?? {})) {
+      const value = resolveTemplate(template, request);
+      if (value !== undefined) payload[field] = value;
     }
-    switch (verb) {
-      case 'list':
-        if (subject === 'executions') return { executions: await this.receipts.list() };
-        if (subject === 'providers') return { providers: await this.catalog.records(), registered: await this.catalog.registered() };
-        requireValue(!subject || subject === 'capabilities', 'COLLECTION_REJECTED', 'List capabilities, providers, or executions.', 2);
-        {
-          const response = await this.runtime.request('list');
-          return object === 'capsule' ? { ...response, result: response.result.filter(item => item.capsuleDigest) } : response;
-        }
-      case 'find': return this.runtime.request('list', { query: subject });
-      case 'search':
-        return subject === 'estate' && object !== 'provider'
-          ? this.runtime.request('list', { query: request.query })
-          : { namespace: subject, evidenceScope: 'DISCOVERY_TESTIMONY', providers: await this.catalog.search(subject, request.query) };
-      case 'inspect': return selectedEntity ?? (object === undefined ? this.inspect(subject) : this.readEntity(object, subject));
-      case 'scenarios': {
-        const capability = await this.inspectCapability(subject);
-        return { capabilityId: subject, capsuleDigest: capability.capsuleDigest,
-          rootScenarioId: capability.rootScenarioId, scenarios: capability.scenarios };
-      }
-      case 'reveal': {
-        requireValue(object !== 'provider' && (object !== undefined || !isLegacyProviderId(subject)), 'PROVIDER_REPRESENTATION_UNAVAILABLE',
-          'Provider discovery has no admitted blueprint. Inspect its descriptor or reveal an admitted capability identity.');
-        const capability = await this.inspectCapability(subject);
-        if (object === 'capsule') requireValue(capability.capsuleDigest, 'CAPSULE_UNAVAILABLE', 'The selected capability has no estate capsule.');
-        return { capsuleDigest: capability.capsuleDigest, ...revealCapability(capability, request) };
-      }
-      case 'providers': {
-        const capability = await this.inspectCapability(subject);
-        return { capabilityId: subject, capsuleDigest: capability.capsuleDigest,
-          bindingSource: capability.plan, boundMechanics: capability.providers,
-          discoveryCandidates: (await this.catalog.records()).filter(provider => provider.candidateCapabilities.includes(subject)) };
-      }
-      case 'resolve': {
-        if (this.routesPath && object === undefined) return this.delegate(request);
-        const response = await this.runtime.request('resolve', { capabilityId: subject });
-        return { ...response, resolutionScope: 'CURRENT_CAPSULE_AND_DECLARED_DEPENDENCIES' };
-      }
-      case 'invoke': return this.invoke(subject, request.input, { object });
-      case 'evaluate': {
-        if (object === undefined && (request.provider || isLegacyProviderId(subject) || this.routesPath)) return this.delegate(request);
-        const capability = selectedEntity ?? await this.inspectCapability(subject);
-        requireValue(capability.capsuleDigest, 'CAPSULE_UNAVAILABLE', 'The selected capability has no estate capsule for fixture proof.');
-        return this.receipts.execute({ verb, subject, capability, estateManifestDigest: capability.estateManifestDigest,
-          context: { evaluationScope: 'CAPSULE_FIXTURE_PROOF', ...(object === undefined ? {} : { object, operation: verb }) } }, () => this.runtime.request('evaluate', {
-          capabilityId: subject, capsuleDigest: capability.capsuleDigest, estateManifestDigest: capability.estateManifestDigest,
-        }));
-      }
-      case 'observe': return this.receipts.read(subject);
-      case 'explain': return explainReceipt(await this.receipts.read(subject));
-      case 'compare': {
-        if (this.routesPath && object === undefined) return this.delegate(request);
-        const read = async id => {
-          if (selectedEntity && id === subject) {
-            const entity = selectedEntity;
-            selectedEntity = undefined;
-            return entity;
-          }
-          return object !== undefined ? this.readEntity(object, id)
-            : isExecutionId(id) ? this.receipts.read(id) : this.inspect(id);
-        };
-        const [left, right] = await Promise.all([read(subject), read(request.other)]);
-        return { comparisonScope: 'STRUCTURAL_DIFFERENCE', left: subject, right: request.other,
-          changes: structuralDiff(left, right) };
-      }
-      case 'provider':
-        if (request.action === 'add') return this.catalog.add(subject);
-        if (request.action === 'remove') return this.catalog.remove(subject);
-        if (request.action === 'list') return { registered: await this.catalog.registered() };
-        throw new SidefxError('PROVIDER_ACTION_REJECTED', 'Use sfx provider add, remove, or list.', 2);
-      case 'verify': return this.runtime.request('verify');
-      default:
-        if (delegatedVerbs.includes(verb)) return this.delegate(request);
-        throw new SidefxError('COMMAND_REJECTED', `Unknown command ${verb}. Run sfx --help.`, 2);
+    payload.requestLineage = [`sfx:${request.object} ${request.verb}`];
+
+    const result = await deliver({
+      estateRoot: this.estateRoot,
+      capabilityId: surface.capabilityId,
+      request: { contractId: surface.request, payload },
+      timeoutMs: this.timeoutMs,
+    });
+
+    requireValue(result && typeof result === 'object', 'DELIVERY_PROTOCOL_REJECTED',
+      'The estate returned no canonical result.', 4);
+    if (result.disposition !== 'completed') {
+      throw new SidefxError(result.errorCode ?? 'ESTATE_OPERATION_FAILED',
+        result.errorCode ?? `The estate returned disposition ${result.disposition}.`, 4,
+        { capabilityId: surface.capabilityId, operation: spec.wraps.operation, result });
     }
+    return result.outcome ?? result;
   }
 }
