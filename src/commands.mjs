@@ -23,9 +23,12 @@ export async function loadCommandMapping(file) {
   'COMMAND_MAPPING_REJECTED', 'Expected sfx-command-mapping.v1 with surfaces, identities and commands.', 2);
 
   for (const [id, surface] of Object.entries(document.surfaces)) {
-    requireValue(typeof surface?.capabilityId === 'string' && surface.capabilityId.length > 0
+    const processBound = typeof surface?.delivery === 'string' && surface.delivery.length > 0;
+    requireValue((processBound ? surface.capabilityId === undefined && surface.request === undefined
+      && surface.rootRefField === undefined && surface.disposableParentRootRefField === undefined
+      : surface?.delivery === undefined && typeof surface?.capabilityId === 'string' && surface.capabilityId.length > 0)
       && Array.isArray(surface.operations) && surface.operations.every(item => typeof item === 'string'),
-    'COMMAND_MAPPING_REJECTED', `Surface ${id} requires a capabilityId and its declared operations.`, 2);
+    'COMMAND_MAPPING_REJECTED', `Surface ${id} requires exactly one capability or process delivery binding and its operations.`, 2);
     for (const field of ['rootRefField', 'disposableParentRootRefField']) {
       requireValue(surface[field] === undefined || typeof surface[field] === 'string'
         && /^[A-Za-z][A-Za-z0-9]*$/.test(surface[field]) && !reserved.includes(surface[field]),
@@ -62,6 +65,8 @@ export async function loadCommandMapping(file) {
         const surface = document.surfaces[spec.wraps.surface];
         requireValue(surface && surface.operations.includes(spec.wraps.operation),
           'COMMAND_MAPPING_REJECTED', `${object} ${verb} wraps an operation its surface does not declare.`, 2);
+        requireValue(!surface.delivery || spec.wraps.fields === undefined,
+          'COMMAND_MAPPING_REJECTED', `${object} ${verb}: process delivery preserves the complete request without field templates.`, 2);
       } else {
         requireValue(typeof spec.missing?.need === 'string', 'COMMAND_MAPPING_REJECTED',
           `${object} ${verb} is MISSING and must record what the estate needs to offer.`, 2);

@@ -1,7 +1,7 @@
 import { requireValue, SidefxError } from './errors.mjs';
 import { assertJson } from './data.mjs';
 import { validateSemanticRequest } from './commands.mjs';
-import { deliver, repositoryRootRef } from './delivery.mjs';
+import { deliver, deliverCommand, repositoryRootRef } from './delivery.mjs';
 import { tmpdir } from 'node:os';
 
 export { SidefxError } from './errors.mjs';
@@ -28,10 +28,11 @@ function resolveTemplate(template, request) {
 }
 
 class Sidefx {
-  constructor({ mapping, estateRoot, timeoutMs } = {}) {
+  constructor({ mapping, estateRoot, deliveries = {}, timeoutMs } = {}) {
     this.mapping = mapping;
     this.estateRoot = estateRoot ?? process.env.SIDEFX_ESTATE;
     this.timeoutMs = timeoutMs;
+    this.deliveries = deliveries;
   }
 
   async execute(request) {
@@ -62,7 +63,10 @@ class Sidefx {
     }
     payload.requestLineage = [`sfx:${request.object} ${request.verb}`];
 
-    const result = await deliver({
+    const result = surface.delivery ? await deliverCommand({
+      binding: Object.hasOwn(this.deliveries, surface.delivery) ? this.deliveries[surface.delivery] : undefined,
+      operation: spec.wraps.operation, request, timeoutMs: this.timeoutMs,
+    }) : await deliver({
       estateRoot: this.estateRoot,
       capabilityId: surface.capabilityId,
       request: { contractId: surface.request, payload },

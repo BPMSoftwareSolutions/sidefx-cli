@@ -19,12 +19,25 @@ export async function loadConfiguration(configPath, cwd = process.cwd()) {
     throw new SidefxError('CONFIGURATION_REJECTED', `Cannot load configuration: ${file}`, 2);
   }
   requireValue(document?.configurationType === 'sfx-project.v1'
-    && Object.keys(document).every(key => ['configurationType', 'estate', 'commands'].includes(key))
+    && Object.keys(document).every(key => ['configurationType', 'estate', 'commands', 'deliveries'].includes(key))
     && (document.estate === undefined || (typeof document.estate === 'string' && document.estate.length > 0))
     && (document.commands === undefined || typeof document.commands === 'string'),
-  'CONFIGURATION_REJECTED', 'Expected sfx-project.v1 with an estate and an optional command mapping.', 2);
+  'CONFIGURATION_REJECTED', 'Expected sfx-project.v1 with optional estate, commands and deliveries.', 2);
   const resolve = value => path.resolve(path.dirname(file), value);
+  requireValue(document.deliveries === undefined || (document.deliveries && typeof document.deliveries === 'object'
+    && !Array.isArray(document.deliveries)), 'CONFIGURATION_REJECTED', 'deliveries must be an object.', 2);
+  const deliveries = Object.create(null);
+  for (const [id, binding] of Object.entries(document.deliveries ?? {})) {
+    requireValue(binding?.type === 'process' && typeof binding.command === 'string' && binding.command.length > 0
+      && Array.isArray(binding.args) && binding.args.every(arg => typeof arg === 'string')
+      && typeof binding.cwd === 'string' && binding.cwd.length > 0
+      && Object.keys(binding).every(key => ['type', 'command', 'args', 'cwd'].includes(key)),
+    'CONFIGURATION_REJECTED', `Delivery ${id} requires a process command, args and cwd.`, 2);
+    deliveries[id] = { ...binding, cwd: resolve(binding.cwd),
+      command: /[\\/]/.test(binding.command) ? resolve(binding.command) : binding.command };
+  }
   return {
+    deliveries,
     ...(document.estate === undefined ? {} : { estateRoot: resolve(document.estate) }),
     mapping: await loadCommandMapping(document.commands === undefined ? shippedMapping : resolve(document.commands)),
   };

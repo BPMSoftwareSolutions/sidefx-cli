@@ -117,7 +117,7 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     }
     const { values, request } = parsed;
     request.input = await readInput(values.input, stdin);
-    const sidefx = factory({ mapping, estateRoot: selectedEstate || configuration.estateRoot,
+    const sidefx = factory({ mapping, deliveries: configuration.deliveries, estateRoot: selectedEstate || configuration.estateRoot,
       timeoutMs: values.timeout === undefined ? undefined : Number(values.timeout) });
     const result = await sidefx.execute(request);
     stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result, mapping)}\n`);

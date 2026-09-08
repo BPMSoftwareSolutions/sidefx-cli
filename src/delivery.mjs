@@ -38,8 +38,24 @@ export async function deliver({ estateRoot, capabilityId, request, timeoutMs = 1
   // A published-estate consumer cannot inherit experimental runtime substitutions.
   for (const key of ['CAPSULE_INVOKE_OVERLAY_ROOT', 'CAPSULE_INVOKE_REPLACEMENT_IDS', 'SIDEFX_PLATFORM_ROOT']) delete env[key];
 
+  return runProcess({ command: process.execPath, args: [entry, 'invoke', capabilityId], cwd, env, request, timeoutMs });
+}
+
+// An explicit binding selects the transport. It receives the same closed command
+// from CLI and SDK; its implementation owns authority selection and interpretation.
+export async function deliverCommand({ binding, operation, request, timeoutMs = 120_000 }) {
+  requireValue(binding, 'DELIVERY_BINDING_REQUIRED', 'The selected surface has no configured process delivery.', 4);
+  requireValue(binding.type === 'process' && typeof binding.command === 'string' && binding.command.length > 0
+    && Array.isArray(binding.args) && binding.args.every(arg => typeof arg === 'string')
+    && typeof binding.cwd === 'string' && binding.cwd.length > 0,
+  'DELIVERY_BINDING_REJECTED', 'Expected a process command, args and cwd.', 4);
+  return runProcess({ ...binding, env: process.env, timeoutMs,
+    request: { deliveryType: 'sfx-command-delivery.v1', operation, request } });
+}
+
+function runProcess({ command, args, cwd, env, request, timeoutMs }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [entry, 'invoke', capabilityId],
+    const child = spawn(command, args,
       { cwd, env, shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     let diagnostics = '';
     let failure;
@@ -58,7 +74,7 @@ export async function deliver({ estateRoot, capabilityId, request, timeoutMs = 1
     });
     child.stderr.on('data', chunk => { diagnostics = (diagnostics + chunk.toString()).slice(-16_384); });
     child.on('error', () => { failure ??= new SidefxError('ESTATE_RUNTIME_REQUIRED',
-      `Could not start the estate runtime in ${estateRoot}.`, 4); });
+      `Could not start the selected runtime in ${cwd}.`, 4); });
     child.stdin.on('error', () => {});
     child.on('close', async code => {
       await parsed;

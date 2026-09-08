@@ -7,12 +7,17 @@ The current executable surface is declared in `sfx.commands.json`. See
 [estate delivery verification](docs/estate-delivery-verification-2026-09-08.md)
 for the current transport boundary, commands, and measured limitations.
 
+[Explicit process delivery](docs/process-delivery.md) connects project-owned
+command mappings to independent runtime providers. The `sfx-embody` project now
+uses this boundary for database-to-memory `sfx capability invoke`, with the
+capability's declared root resolved from SQL and canonical input preserved.
+
 `sfx` is a capability interface over an existing Managed Capability Estate. The
 current JavaScript/Node implementation is a **candidate interface provider**.
 It reveals capsule-owned meaning and delegates estate execution to the installed
-`sda-bootstrap`. Explicitly configured local capabilities can also execute through
-a digest-bound process provider. These are separate authority scopes; a local
-provider is never represented as an admitted estate capsule.
+`sda-bootstrap`. Explicit project mappings can also select independent process
+providers, which own their authority and integrity checks. These are separate
+authority scopes; a process binding does not imply an admitted estate capsule.
 
 **Capability requirements determine the required profile. Eligible admitted
 providers are resolved against constraints and evidence. The selected provider

@@ -1,5 +1,12 @@
 # SideFX command model
 
+Current transport authority is the selected `sfx-command-mapping.v1` file.
+The [process delivery contract](process-delivery.md) defines explicit runtime
+bindings and the shared CLI/SDK envelope, including database-to-memory invocation
+through the independent `sfx-embody` provider. The older route/catalog examples
+below document historical interfaces; consult `sfx --help` and the selected
+mapping for the executable surface.
+
 ## Entity Neutrality Law
 
 No entity instance, business domain, provider, or implementation technology may
