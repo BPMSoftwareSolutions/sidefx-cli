@@ -3,6 +3,10 @@
 Repository: [BPMSoftwareSolutions/sidefx-cli](https://github.com/BPMSoftwareSolutions/sidefx-cli).
 The workspace and npm package are named `sidefx-cli`; the terminal command is `sfx`.
 
+The current executable surface is declared in `sfx.commands.json`. See
+[estate delivery verification](docs/estate-delivery-verification-2026-09-08.md)
+for the current transport boundary, commands, and measured limitations.
+
 `sfx` is a capability interface over an existing Managed Capability Estate. The
 current JavaScript/Node implementation is a **candidate interface provider**.
 It reveals capsule-owned meaning and delegates estate execution to the installed
@@ -39,7 +43,8 @@ and capsule authority, rather than standalone top-level commands.
 
 ## Run it
 
-Requires Node.js 20 or newer. This package has no npm dependencies. The estate
+Requires Node.js 20 or newer. Run `npm ci` to install the pinned streaming JSON
+transport dependency. The estate
 must have its own pinned runtime installed (`npm ci` in that estate when needed).
 Provider implementations are installed separately in the selected estate; none is
 bundled as a CLI dependency or export.

@@ -2,6 +2,7 @@ import { requireValue, SidefxError } from './errors.mjs';
 import { assertJson } from './data.mjs';
 import { validateSemanticRequest } from './commands.mjs';
 import { deliver, repositoryRootRef } from './delivery.mjs';
+import { tmpdir } from 'node:os';
 
 export { SidefxError } from './errors.mjs';
 export { loadCommandMapping } from './commands.mjs';
@@ -52,6 +53,9 @@ class Sidefx {
     const surface = this.mapping.surfaces[spec.wraps.surface];
     const payload = { command: spec.wraps.operation };
     if (surface.rootRefField) payload[surface.rootRefField] = repositoryRootRef(this.estateRoot ?? '.');
+    if (surface.disposableParentRootRefField) {
+      payload[surface.disposableParentRootRefField] = repositoryRootRef(tmpdir());
+    }
     for (const [field, template] of Object.entries(spec.wraps.fields ?? {})) {
       const value = resolveTemplate(template, request);
       if (value !== undefined) payload[field] = value;

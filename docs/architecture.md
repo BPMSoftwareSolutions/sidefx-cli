@@ -1,5 +1,11 @@
 # Terminal projection architecture
 
+The current implementation delegates through the installed bootstrap's declared
+executable and the surfaces in `sfx.commands.json`. The older adapter and local
+provider descriptions below are historical; use
+[estate delivery verification](estate-delivery-verification-2026-09-08.md)
+for the exercised current boundary.
+
 The updated [intent](intent.md) establishes `sfx` as the terminal command name.
 SideFX remains the product and capability namespace.
 

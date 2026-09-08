@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { requireValue, SidefxError } from './errors.mjs';
+import { readDeliveryResult } from './delivery-result.mjs';
 
 // sfx invokes the estate's own delivery capabilities through the bootstrap's declared bin.
 // It never imports the bootstrap or reads a capsule. Everything below is transport.
@@ -37,11 +38,9 @@ export async function deliver({ estateRoot, capabilityId, request, timeoutMs = 1
   // A published-estate consumer cannot inherit experimental runtime substitutions.
   for (const key of ['CAPSULE_INVOKE_OVERLAY_ROOT', 'CAPSULE_INVOKE_REPLACEMENT_IDS', 'SIDEFX_PLATFORM_ROOT']) delete env[key];
 
-  const stdout = await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [entry, 'invoke', capabilityId],
       { cwd, env, shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-    const chunks = [];
-    let size = 0;
     let diagnostics = '';
     let failure;
     const stop = (code, message) => { failure ??= new SidefxError(code, message, 4); child.kill(); };
@@ -50,29 +49,29 @@ export async function deliver({ estateRoot, capabilityId, request, timeoutMs = 1
     const interrupt = () => stop('DELIVERY_INTERRUPTED', 'Delivery was interrupted; effects may have occurred.');
     process.once('SIGINT', interrupt);
     process.once('SIGTERM', interrupt);
-    child.stdout.on('data', chunk => {
-      size += chunk.length;
-      if (size > 32 * 1024 * 1024) stop('DELIVERY_OUTPUT_LIMIT', 'Delivery output exceeded 32 MiB.');
-      else chunks.push(chunk);
+    let result, protocolFailure;
+    let receivedOutput = false;
+    child.stdout.once('data', () => { receivedOutput = true; });
+    const parsed = readDeliveryResult(child.stdout).then(value => { result = value; }, error => {
+      protocolFailure = error;
+      child.kill();
     });
     child.stderr.on('data', chunk => { diagnostics = (diagnostics + chunk.toString()).slice(-16_384); });
     child.on('error', () => { failure ??= new SidefxError('ESTATE_RUNTIME_REQUIRED',
       `Could not start the estate runtime in ${estateRoot}.`, 4); });
     child.stdin.on('error', () => {});
-    child.on('close', code => {
+    child.on('close', async code => {
+      await parsed;
       clearTimeout(timer);
       process.removeListener('SIGINT', interrupt);
       process.removeListener('SIGTERM', interrupt);
       if (failure) return reject(failure);
-      const text = Buffer.concat(chunks).toString('utf8');
-      if (code !== 0 && !text.trim()) {
+      if (code !== 0 && !receivedOutput) {
         return reject(new SidefxError('DELIVERY_FAILED', `Estate delivery exited ${code}. ${diagnostics.trim()}`, 4));
       }
-      resolve(text);
+      if (protocolFailure) return reject(protocolFailure);
+      resolve(result);
     });
     child.stdin.end(JSON.stringify(request));
   });
-
-  try { return JSON.parse(stdout); }
-  catch { throw new SidefxError('DELIVERY_PROTOCOL_REJECTED', 'The estate returned no canonical JSON result.', 4); }
 }

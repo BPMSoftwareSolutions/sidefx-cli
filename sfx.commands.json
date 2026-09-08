@@ -6,6 +6,7 @@
       "capabilityId": "deliver-capsule-estate-cli",
       "request": "capsule-estate-cli-delivery-request.v2",
       "rootRefField": "repositoryRootRef",
+      "disposableParentRootRefField": "disposableParentRootRef",
       "operations": [
         "verify",
         "resolve",

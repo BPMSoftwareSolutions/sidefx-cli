@@ -26,6 +26,11 @@ export async function loadCommandMapping(file) {
     requireValue(typeof surface?.capabilityId === 'string' && surface.capabilityId.length > 0
       && Array.isArray(surface.operations) && surface.operations.every(item => typeof item === 'string'),
     'COMMAND_MAPPING_REJECTED', `Surface ${id} requires a capabilityId and its declared operations.`, 2);
+    for (const field of ['rootRefField', 'disposableParentRootRefField']) {
+      requireValue(surface[field] === undefined || typeof surface[field] === 'string'
+        && /^[A-Za-z][A-Za-z0-9]*$/.test(surface[field]) && !reserved.includes(surface[field]),
+      'COMMAND_MAPPING_REJECTED', `Surface ${id} has an invalid ${field}.`, 2);
+    }
   }
   const identities = {};
   for (const [id, declared] of Object.entries(document.identities)) {
