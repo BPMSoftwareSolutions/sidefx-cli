@@ -17,6 +17,7 @@ Options:
   --estate PATH      Estate with its installed sda-bootstrap (or SIDEFX_ESTATE)
   --input VALUE      Canonical JSON, @file.json, or - for standard input
   --as VIEW          Selectable view, where the operation declares one
+  --format NAME      Presentation the operation offers (e.g. markdown)
   --scenario ID      Select a scenario
   --namespace NAME   Namespace filter, where the operation declares one
   --json             Machine-readable JSON; diagnostics remain on stderr
@@ -60,6 +61,7 @@ function parseOptions(argv) {
     return parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
       config: { type: 'string' }, estate: { type: 'string' }, input: { type: 'string' },
       as: { type: 'string' }, scenario: { type: 'string' }, namespace: { type: 'string' },
+      format: { type: 'string' },
       timeout: { type: 'string' }, json: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' },
     } });
@@ -71,7 +73,7 @@ export function parseCommand(argv, mapping) {
   if (values.help || values.version || positionals.length === 0) return { values, help: !values.version, version: values.version };
   if (values.timeout !== undefined) requireValue(/^\d+$/.test(values.timeout) && Number(values.timeout) > 0
     && Number(values.timeout) <= 2_147_483_647, 'INVALID_TIMEOUT', '--timeout must be a positive integer below 2147483648.', 2);
-  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, namespace: values.namespace };
+  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, namespace: values.namespace };
   requireValue(values.scenario === undefined || request.scenario === undefined,
     'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
   if (values.scenario !== undefined) request.scenario = values.scenario;

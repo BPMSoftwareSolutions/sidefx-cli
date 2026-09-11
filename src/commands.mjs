@@ -5,8 +5,8 @@ import { bytesDigest } from './data.mjs';
 // sfx owns its vocabulary as data, never as code. This module loads and validates that
 // mapping. It knows nothing about capsules, plans, providers or authoring languages.
 const specFields = ['min', 'max', 'query', 'namespace', 'identity', 'view', 'scenarioOperand',
-  'input', 'observation', 'wraps', 'status', 'missing', 'description'];
-const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'input', 'namespace']);
+  'input', 'observation', 'format', 'wraps', 'status', 'missing', 'description'];
+const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'input', 'namespace']);
 const reserved = ['constructor', 'prototype', '__proto__'];
 const flag = value => value === undefined || typeof value === 'boolean';
 const name = value => typeof value === 'string' && /^[a-z][a-z0-9-]*$/.test(value) && !reserved.includes(value);
@@ -53,7 +53,7 @@ export async function loadCommandMapping(file) {
         && Object.keys(spec).every(key => specFields.includes(key))
         && Number.isInteger(spec.min) && spec.min >= 0 && spec.min <= 2
         && (spec.max === null ? spec.query === true : Number.isInteger(spec.max) && spec.max >= spec.min && spec.max <= 2)
-        && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input) && flag(spec.observation)
+        && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input) && flag(spec.observation) && flag(spec.format)
         && (spec.identity === undefined || Object.hasOwn(identities, spec.identity))
         && (spec.description === undefined || typeof spec.description === 'string'),
       'COMMAND_MAPPING_REJECTED', `Invalid operation: ${object} ${verb}.`, 2);
@@ -125,6 +125,8 @@ export function validateSemanticRequest(request, mapping) {
   }
   requireValue(request.as === undefined || spec.view === true,
     'OPTION_NOT_APPLICABLE', '--as applies to operations declaring a selectable view.', 2);
+  requireValue(request.format === undefined || spec.format === true,
+    'OPTION_NOT_APPLICABLE', '--format applies only to operations declaring a selectable presentation.', 2);
   requireValue(request.scenario === undefined || spec.scenarioOperand || spec.view === true,
     'OPTION_NOT_APPLICABLE', 'Scenario selection applies to scenario operands and selectable views.', 2);
   requireValue(request.input === undefined || spec.input === true,
