@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { createSidefx } from './index.mjs';
 import { readJson } from './data.mjs';
 import { requireValue, SidefxError, errorRecord } from './errors.mjs';
-import { render } from './render.mjs';
-import { parseSemanticCommand, validateSemanticRequest } from './commands.mjs';
+import { render, renderObservation } from './render.mjs';
+import { parseSemanticCommand, validateSemanticRequest, semanticCommand } from './commands.mjs';
 import { loadConfiguration } from './configuration.mjs';
 
 // Terminal-owned help. The command list comes from the loaded mapping, never from here.
@@ -20,6 +20,7 @@ Options:
   --scenario ID      Select a scenario
   --namespace NAME   Namespace filter, where the operation declares one
   --json             Machine-readable JSON; diagnostics remain on stderr
+                     (an observable operation streams its telemetry there too)
   --timeout MS       Delivery timeout in milliseconds (default 120000)
   --help, -h         Show this help
   --version          Show the version
@@ -119,7 +120,13 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     request.input = await readInput(values.input, stdin);
     const sidefx = factory({ mapping, deliveries: configuration.deliveries, estateRoot: selectedEstate || configuration.estateRoot,
       timeoutMs: values.timeout === undefined ? undefined : Number(values.timeout) });
-    const result = await sidefx.execute(request);
+    // An operation the mapping declares observable streams its telemetry as the
+    // estate reports it. Telemetry is diagnostics: it goes to stderr, never to the
+    // result on stdout, and it cannot change the delivered outcome.
+    const observed = semanticCommand(request.object, request.verb, mapping)?.observation === true;
+    const result = await sidefx.execute(request, observed ? {
+      onObservation(event) { stderr.write(renderObservation(event, json) + '\n'); },
+    } : {});
     stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result, mapping)}\n`);
     return 0;
   } catch (error) {

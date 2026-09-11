@@ -43,17 +43,17 @@ export async function deliver({ estateRoot, capabilityId, request, timeoutMs = 1
 
 // An explicit binding selects the transport. It receives the same closed command
 // from CLI and SDK; its implementation owns authority selection and interpretation.
-export async function deliverCommand({ binding, operation, request, timeoutMs = 120_000 }) {
+export async function deliverCommand({ binding, operation, request, timeoutMs = 120_000, onObservation }) {
   requireValue(binding, 'DELIVERY_BINDING_REQUIRED', 'The selected surface has no configured process delivery.', 4);
   requireValue(binding.type === 'process' && typeof binding.command === 'string' && binding.command.length > 0
     && Array.isArray(binding.args) && binding.args.every(arg => typeof arg === 'string')
     && typeof binding.cwd === 'string' && binding.cwd.length > 0,
   'DELIVERY_BINDING_REJECTED', 'Expected a process command, args and cwd.', 4);
-  return runProcess({ ...binding, env: process.env, timeoutMs,
+  return runProcess({ ...binding, env: { ...process.env, ...(onObservation ? { SIDEFX_OBSERVE: '1' } : {}) }, timeoutMs, onObservation,
     request: { deliveryType: 'sfx-command-delivery.v1', operation, request } });
 }
 
-function runProcess({ command, args, cwd, env, request, timeoutMs }) {
+function runProcess({ command, args, cwd, env, request, timeoutMs, onObservation }) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args,
       { cwd, env, shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -72,7 +72,20 @@ function runProcess({ command, args, cwd, env, request, timeoutMs }) {
       protocolFailure = error;
       child.kill();
     });
-    child.stderr.on('data', chunk => { diagnostics = (diagnostics + chunk.toString()).slice(-16_384); });
+    let observationBuffer = '';
+    child.stderr.on('data', chunk => {
+      diagnostics = (diagnostics + chunk.toString()).slice(-16_384);
+      if (!onObservation) return;
+      observationBuffer += chunk.toString();
+      let end;
+      while ((end = observationBuffer.indexOf('\n')) >= 0) {
+        const line = observationBuffer.slice(0, end); observationBuffer = observationBuffer.slice(end + 1);
+        if (!line.startsWith('SFX_OBSERVATION ') || line.length > 16_384) continue;
+        try { onObservation(JSON.parse(line.slice(16))); }
+        catch { /* Telemetry cannot change the delivery outcome. */ }
+      }
+      if (observationBuffer.length > 16_384) observationBuffer = '';
+    });
     child.on('error', () => { failure ??= new SidefxError('ESTATE_RUNTIME_REQUIRED',
       `Could not start the selected runtime in ${cwd}.`, 4); });
     child.stdin.on('error', () => {});

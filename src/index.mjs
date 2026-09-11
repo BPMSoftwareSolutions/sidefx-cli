@@ -35,7 +35,7 @@ class Sidefx {
     this.deliveries = deliveries;
   }
 
-  async execute(request) {
+  async execute(request, { onObservation } = {}) {
     request = { ...request };
     if (request.input !== undefined) {
       assertJson(request.input);
@@ -66,6 +66,7 @@ class Sidefx {
     const result = surface.delivery ? await deliverCommand({
       binding: Object.hasOwn(this.deliveries, surface.delivery) ? this.deliveries[surface.delivery] : undefined,
       operation: spec.wraps.operation, request, timeoutMs: this.timeoutMs,
+      onObservation,
     }) : await deliver({
       estateRoot: this.estateRoot,
       capabilityId: surface.capabilityId,

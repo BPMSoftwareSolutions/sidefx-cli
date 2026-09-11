@@ -5,7 +5,7 @@ import { bytesDigest } from './data.mjs';
 // sfx owns its vocabulary as data, never as code. This module loads and validates that
 // mapping. It knows nothing about capsules, plans, providers or authoring languages.
 const specFields = ['min', 'max', 'query', 'namespace', 'identity', 'view', 'scenarioOperand',
-  'input', 'wraps', 'status', 'missing', 'description'];
+  'input', 'observation', 'wraps', 'status', 'missing', 'description'];
 const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'input', 'namespace']);
 const reserved = ['constructor', 'prototype', '__proto__'];
 const flag = value => value === undefined || typeof value === 'boolean';
@@ -53,7 +53,7 @@ export async function loadCommandMapping(file) {
         && Object.keys(spec).every(key => specFields.includes(key))
         && Number.isInteger(spec.min) && spec.min >= 0 && spec.min <= 2
         && (spec.max === null ? spec.query === true : Number.isInteger(spec.max) && spec.max >= spec.min && spec.max <= 2)
-        && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input)
+        && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input) && flag(spec.observation)
         && (spec.identity === undefined || Object.hasOwn(identities, spec.identity))
         && (spec.description === undefined || typeof spec.description === 'string'),
       'COMMAND_MAPPING_REJECTED', `Invalid operation: ${object} ${verb}.`, 2);

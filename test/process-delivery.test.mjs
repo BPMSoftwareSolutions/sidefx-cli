@@ -25,6 +25,31 @@ async function project(t, source) {
 
 const echo = `const chunks=[];for await(const c of process.stdin)chunks.push(c);process.stdout.write(JSON.stringify({disposition:'terminated',outcome:JSON.parse(Buffer.concat(chunks).toString('utf8'))}));`;
 
+test('optional observations stream before completion without changing command results', async t => {
+  const p = await project(t, `
+    process.stdin.resume();
+    if(process.env.SIDEFX_OBSERVE==='1'){
+      process.stderr.write('ordinary diagnostic\\nSFX_OBSERVATION {"sequence":');
+      await new Promise(r=>setTimeout(r,20));
+      process.stderr.write('1,"status":"started"}\\nSFX_OBSERVATION invalid\\n');
+    }
+    await new Promise(r=>setTimeout(r,80));
+    process.stdout.write(JSON.stringify({disposition:'terminated',outcome:{value:42}}));
+  `);
+  const request = { object:'capability', verb:'invoke', subject:'example' };
+  let completed = false;
+  const events = [];
+  const result = await createSidefx(p).execute(request, { onObservation(event) {
+    assert.equal(completed, false);
+    events.push(event);
+    throw new Error('observer failure must not affect execution');
+  } });
+  completed = true;
+  assert.deepEqual(events, [{sequence:1,status:'started'}]);
+  assert.deepEqual(result, {value:42});
+  assert.deepEqual(await createSidefx(p).execute(request), result);
+});
+
 test('CLI and SDK send the same complete typed command through the declared process', async t => {
   const p = await project(t, echo);
   const input = { contractId: 'domain.v1', object: 'different-domain', value: 'é能力', nested: [null, true] };
