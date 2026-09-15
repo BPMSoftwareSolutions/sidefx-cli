@@ -8,8 +8,8 @@ import { bytesDigest } from './data.mjs';
 // reads them to scope its stream; the estate remains the authority for meaning.
 export const OBSERVATION_ALTITUDES = Object.freeze(['scenario', 'mechanic', 'provider', 'physical']);
 const specFields = ['min', 'max', 'query', 'namespace', 'identity', 'view', 'scenarioOperand',
-  'input', 'inputType', 'observation', 'observationAltitudes', 'format', 'display', 'wraps', 'status', 'missing', 'description'];
-const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'display', 'input', 'inputType', 'namespace', 'observationAltitudes']);
+  'input', 'inputType', 'observation', 'observationAltitudes', 'format', 'display', 'workspace', 'targets', 'fullMechanics', 'wraps', 'status', 'missing', 'description'];
+const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'display', 'input', 'inputType', 'namespace', 'observationAltitudes', 'workspace', 'targets', 'fullMechanics']);
 const reserved = ['constructor', 'prototype', '__proto__'];
 const flag = value => value === undefined || typeof value === 'boolean';
 const name = value => typeof value === 'string' && /^[a-z][a-z0-9-]*$/.test(value) && !reserved.includes(value);
@@ -57,6 +57,7 @@ export async function loadCommandMapping(file) {
         && Number.isInteger(spec.min) && spec.min >= 0 && spec.min <= 2
         && (spec.max === null ? spec.query === true : Number.isInteger(spec.max) && spec.max >= spec.min && spec.max <= 2)
         && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input) && flag(spec.inputType) && flag(spec.observation) && flag(spec.observationAltitudes) && flag(spec.format) && flag(spec.display)
+        && flag(spec.workspace) && flag(spec.targets) && flag(spec.fullMechanics)
         && (spec.identity === undefined || Object.hasOwn(identities, spec.identity))
         && (spec.description === undefined || typeof spec.description === 'string'),
       'COMMAND_MAPPING_REJECTED', `Invalid operation: ${object} ${verb}.`, 2);
@@ -147,5 +148,18 @@ export function validateSemanticRequest(request, mapping) {
     'OPTION_NOT_APPLICABLE', '--input applies only to operations declaring canonical input.', 2);
   requireValue(request.namespace === undefined || spec.namespace === true,
     'OPTION_NOT_APPLICABLE', '--namespace applies only to operations declaring it.', 2);
+  requireValue(request.workspace === undefined || spec.workspace === true,
+    'OPTION_NOT_APPLICABLE', '--workspace applies only to operations declaring a projection workspace.', 2);
+  requireValue(request.workspace === undefined || (typeof request.workspace === 'string' && request.workspace.length > 0),
+    'USAGE_ERROR', '--workspace requires a directory path.', 2);
+  requireValue(request.targets === undefined || spec.targets === true,
+    'OPTION_NOT_APPLICABLE', '--targets applies only to operations declaring projection targets.', 2);
+  requireValue(request.targets === undefined || (Array.isArray(request.targets) && request.targets.length > 0
+    && request.targets.every(target => typeof target === 'string' && target.length > 0)),
+  'USAGE_ERROR', '--targets must name at least one projection target.', 2);
+  requireValue(request.fullMechanics === undefined || spec.fullMechanics === true,
+    'OPTION_NOT_APPLICABLE', '--full-mechanics applies only to operations declaring the complete mechanical projection.', 2);
+  requireValue(request.fullMechanics === undefined || request.fullMechanics === true,
+    'USAGE_ERROR', '--full-mechanics carries no value.', 2);
   return spec;
 }

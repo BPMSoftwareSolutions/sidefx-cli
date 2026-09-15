@@ -21,6 +21,12 @@ Options:
   --display          Apply the capability's declared display projection
   --scenario ID      Select a scenario
   --namespace NAME   Namespace filter, where the operation declares one
+  --workspace PATH   Projection workspace: the declared documents are staged
+                     there and the mechanical bodies generate under projected/
+  --targets NAMES    Comma-separated projection targets, where the operation
+                     projects; the workspace's declared targets are the default
+  --full-mechanics   Require every canonical cell's platform mechanic to be bound
+                     for every selected target; projection operations only
   --observation-altitude NAME  Stream only the named semantic altitude (repeatable:
                      scenario, mechanic, provider, physical); observe only
   --trace            Stream the complete mechanical testimony; observe only.
@@ -70,6 +76,7 @@ function parseOptions(argv) {
       as: { type: 'string' }, scenario: { type: 'string' }, namespace: { type: 'string' },
       format: { type: 'string' },
       display: { type: 'boolean' },
+      workspace: { type: 'string' }, targets: { type: 'string' }, 'full-mechanics': { type: 'boolean' },
       'observation-altitude': { type: 'string', multiple: true },
       trace: { type: 'boolean' },
       timeout: { type: 'string' }, json: { type: 'boolean' },
@@ -83,7 +90,8 @@ export function parseCommand(argv, mapping) {
   if (values.help || values.version || positionals.length === 0) return { values, help: !values.version, version: values.version };
   if (values.timeout !== undefined) requireValue(/^\d+$/.test(values.timeout) && Number(values.timeout) > 0
     && Number(values.timeout) <= 2_147_483_647, 'INVALID_TIMEOUT', '--timeout must be a positive integer below 2147483648.', 2);
-  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, display: values.display, inputType: values['input-type'], namespace: values.namespace, observationAltitudes: values['observation-altitude'] };
+  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, display: values.display, inputType: values['input-type'], namespace: values.namespace, observationAltitudes: values['observation-altitude'], workspace: values.workspace, fullMechanics: values['full-mechanics'],
+    targets: values.targets === undefined ? undefined : values.targets.split(',').filter(target => target.length > 0) };
   requireValue(values.scenario === undefined || request.scenario === undefined,
     'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
   if (values.scenario !== undefined) request.scenario = values.scenario;

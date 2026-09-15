@@ -211,6 +211,19 @@ function format(operation, payload, request) {
     const value = select(payload?.result, payload.display.select);
     return payload.display.as === 'json' ? pretty(value) : safe(String(value ?? ''));
   }
+  // A projection report names where the mechanical bodies landed and what each
+  // target's plan covers. The digests are the estate's; nothing is recomputed.
+  if (operation === 'project' && Array.isArray(payload?.plans)) {
+    const lines = [`Projected ${fieldValue(payload.capabilityId)} -> ${fieldValue(payload.outDir)}`];
+    for (const plan of payload.plans) {
+      const closure = plan.mechanicsComplete === true ? '' : '  [mechanics incomplete]';
+      lines.push(`  ${String(plan.target).padEnd(7)}  canonical ${fieldValue(plan.canonicalGraphDigest)}`
+        + `  bindings ${plan.providerBindings}/${plan.requiredSlots}${closure}`);
+    }
+    lines.push(`${fieldValue(payload.conformance)}; ${payload.documents ?? 0} declared document(s), `
+      + `${payload.files ?? 0} file(s)${payload.fullMechanics === true ? '; full mechanics required' : ''}`);
+    return lines.join('\n');
+  }
   // A narrative is human language the estate composed from its own retained
   // authority. It is printed exactly as delivered.
   if (Array.isArray(payload?.narrative) && payload.narrative.every(line => typeof line === 'string')) {
