@@ -112,6 +112,9 @@ function meaningLines(payload, request) {
   lines.push(`Capability  ${fieldValue(payload?.capabilityId)}`);
   lines.push(`Namespace   ${fieldValue(meaning.namespaceId)}`);
   lines.push(`Root        ${fieldValue(meaning.rootScenarioId)}`);
+  // The declared root and the scenario actually read are distinct facts.
+  if (typeof meaning.selectedScenarioId === 'string' && meaning.selectedScenarioId !== meaning.rootScenarioId)
+    lines.push(`Selected    ${fieldValue(meaning.selectedScenarioId)}`);
   lines.push(`View        ${fieldValue(payload?.view)}`);
   lines.push(`Snapshot    ${fieldValue(payload?.evidence?.snapshotId)}`);
   if (feature) {
@@ -141,6 +144,14 @@ function meaningLines(payload, request) {
     lines.push(`    input    ${fieldValue(scenario.input?.inputId)}  (${fieldValue(scenario.input?.contract?.contractId)})`);
     lines.push(`    event    ${fieldValue(scenario.event?.eventId)}  (${fieldValue(scenario.event?.executionAuthorityId)})`);
     lines.push(`    outcome  ${fieldValue(scenario.outcome?.outcomeId)}  (${fieldValue(scenario.outcome?.contract?.contractId)})${scenario.outcome?.terminal ? '  [terminal]' : ''}`);
+  }
+  const selected = meaning.selectedScenario;
+  if (selected && meaning.selectedScenarioId !== meaning.rootScenarioId) {
+    lines.push(...heading(`Selected scenario (${meaning.selectedScenarioId})`));
+    lines.push(`  owning capability  ${fieldValue(selected.capabilityId)}`);
+    lines.push(`  input    ${fieldValue(selected.input?.inputId)}  (${fieldValue(selected.input?.contract?.contractId)})`);
+    lines.push(`  event    ${fieldValue(selected.event?.eventId)}  (${fieldValue(selected.event?.executionAuthorityId)})`);
+    lines.push(`  outcome  ${fieldValue(selected.outcome?.outcomeId)}  (${fieldValue(selected.outcome?.contract?.contractId)})${selected.outcome?.terminal ? '  [terminal]' : ''}`);
   }
   const authorities = graph.executionAuthorities ?? [];
   lines.push(...heading(`Execution plan (${authorities.length})`));

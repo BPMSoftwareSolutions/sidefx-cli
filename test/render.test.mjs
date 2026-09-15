@@ -108,6 +108,24 @@ test('reveal renders the declared canonical story read by the reader capability'
   const markdown = render({ object: 'capability', verb: 'reveal', format: 'markdown' }, payload, mapping);
   assert.ok(markdown.includes('## Canonical feature'));
   assert.ok(markdown.includes('## Execution plan (1)'));
+
+  // A selected scenario is reported as a distinct declared fact, with its faces.
+  const selectedPayload = { ...payload, meaning: { ...payload.meaning,
+    selectedScenarioId: 'replay-scaffold-generation',
+    selectedScenario: { scenarioId: 'replay-scaffold-generation', capabilityId: 'generate-executable-capability-scaffold',
+      input: { inputId: 'replay-input', contract: { contractId: 'replay-input.v1' } },
+      event: { eventId: 'replay-requested', executionAuthorityId: 'replay.v1' },
+      outcome: { outcomeId: 'replay-result', contract: { contractId: 'replay-result.v1' }, terminal: false } } } };
+  const selectedText = render({ object: 'capability', verb: 'reveal' }, selectedPayload, mapping);
+  assert.ok(selectedText.includes('Selected    replay-scaffold-generation'));
+  assert.ok(selectedText.includes('Selected scenario (replay-scaffold-generation)'));
+  assert.ok(selectedText.includes('owning capability  generate-executable-capability-scaffold'));
+  assert.ok(selectedText.includes('replay-input.v1'));
+  assert.ok(selectedText.includes('replay-result.v1'));
+  // Selecting the root itself stays the root: no Selected reading is printed.
+  const rootSelected = render({ object: 'capability', verb: 'reveal' }, { ...payload,
+    meaning: { ...payload.meaning, selectedScenarioId: payload.meaning.rootScenarioId } }, mapping);
+  assert.ok(!rootSelected.includes('Selected'));
 });
 
 test('--trace keeps the mechanical depth: the story first, then the observed tree', () => {
