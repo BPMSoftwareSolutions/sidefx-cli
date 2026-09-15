@@ -27,6 +27,9 @@ Options:
                      projects; the workspace's declared targets are the default
   --full-mechanics   Require every canonical cell's platform mechanic to be bound
                      for every selected target; projection operations only
+  --codegen-pattern TYPE  Render that execution pattern type in codegen mode,
+                     splicing the registered resolver's emitted code into the
+                     generated body (repeatable); projection operations only
   --observation-altitude NAME  Stream only the named semantic altitude (repeatable:
                      scenario, mechanic, provider, physical); observe only
   --trace            Stream the complete mechanical testimony; observe only.
@@ -77,6 +80,7 @@ function parseOptions(argv) {
       format: { type: 'string' },
       display: { type: 'boolean' },
       workspace: { type: 'string' }, targets: { type: 'string' }, 'full-mechanics': { type: 'boolean' },
+      'codegen-pattern': { type: 'string', multiple: true },
       'observation-altitude': { type: 'string', multiple: true },
       trace: { type: 'boolean' },
       timeout: { type: 'string' }, json: { type: 'boolean' },
@@ -90,7 +94,7 @@ export function parseCommand(argv, mapping) {
   if (values.help || values.version || positionals.length === 0) return { values, help: !values.version, version: values.version };
   if (values.timeout !== undefined) requireValue(/^\d+$/.test(values.timeout) && Number(values.timeout) > 0
     && Number(values.timeout) <= 2_147_483_647, 'INVALID_TIMEOUT', '--timeout must be a positive integer below 2147483648.', 2);
-  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, display: values.display, inputType: values['input-type'], namespace: values.namespace, observationAltitudes: values['observation-altitude'], workspace: values.workspace, fullMechanics: values['full-mechanics'],
+  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, display: values.display, inputType: values['input-type'], namespace: values.namespace, observationAltitudes: values['observation-altitude'], workspace: values.workspace, fullMechanics: values['full-mechanics'], codegenPatterns: values['codegen-pattern'],
     targets: values.targets === undefined ? undefined : values.targets.split(',').filter(target => target.length > 0) };
   requireValue(values.scenario === undefined || request.scenario === undefined,
     'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);

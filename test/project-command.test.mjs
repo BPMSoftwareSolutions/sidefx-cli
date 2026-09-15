@@ -15,7 +15,7 @@ async function project(t) {
     identities: { capability: { pattern: '^[a-z][a-z0-9.-]*$', message: 'Supply a capability identity.' } },
     surfaces: { projection: { delivery: 'local-process', operations: ['project', 'invoke'] } },
     commands: { capability: {
-      project: { min: 1, max: 1, identity: 'capability', workspace: true, targets: true, fullMechanics: true,
+      project: { min: 1, max: 1, identity: 'capability', workspace: true, targets: true, fullMechanics: true, codegenPatterns: true,
         wraps: { surface: 'projection', operation: 'project' } },
       invoke: { min: 1, max: 1, identity: 'capability', input: true, wraps: { surface: 'projection', operation: 'invoke' } },
     } } }));
@@ -27,17 +27,19 @@ async function project(t) {
   return { configFile, ...await loadConfiguration(configFile) };
 }
 
-test('sfx capability project carries workspace, targets and full mechanics through the process delivery', async t => {
+test('sfx capability project carries workspace, targets, full mechanics and codegen patterns through the process delivery', async t => {
   const p = await project(t);
   let stdout = '', stderr = '';
   const exit = await runCli(['capability', 'project', 'resolve-equity-market-price-evidence',
-    '--workspace', 'embodiments/equity', '--targets', 'node,python,csharp', '--full-mechanics', '--config', p.configFile, '--json'],
+    '--workspace', 'embodiments/equity', '--targets', 'node,python,csharp', '--full-mechanics',
+    '--codegen-pattern', 'sequence', '--codegen-pattern', 'selection', '--config', p.configFile, '--json'],
   { stdout: { write: value => { stdout += value; } }, stderr: { write: value => { stderr += value; } } });
   assert.equal(exit, 0, stderr);
   const delivered = JSON.parse(stdout);
   assert.equal(delivered.operation, 'project');
   assert.deepEqual(delivered.request, { object: 'capability', verb: 'project', subject: 'resolve-equity-market-price-evidence',
-    workspace: 'embodiments/equity', targets: ['node', 'python', 'csharp'], fullMechanics: true });
+    workspace: 'embodiments/equity', targets: ['node', 'python', 'csharp'], fullMechanics: true,
+    codegenPatterns: ['sequence', 'selection'] });
 });
 
 test('projection options are refused where the operation does not declare them', async t => {
@@ -46,7 +48,13 @@ test('projection options are refused where the operation does not declare them',
     { code: 'OPTION_NOT_APPLICABLE' });
   await assert.rejects(createSidefx(p).execute({ object: 'capability', verb: 'invoke', subject: 'example', input: {}, fullMechanics: true }),
     { code: 'OPTION_NOT_APPLICABLE' });
+  await assert.rejects(createSidefx(p).execute({ object: 'capability', verb: 'invoke', subject: 'example', input: {}, codegenPatterns: ['sequence'] }),
+    { code: 'OPTION_NOT_APPLICABLE' });
   await assert.rejects(createSidefx(p).execute({ object: 'capability', verb: 'project', subject: 'example', targets: [] }),
+    { code: 'USAGE_ERROR' });
+  await assert.rejects(createSidefx(p).execute({ object: 'capability', verb: 'project', subject: 'example', codegenPatterns: [] }),
+    { code: 'USAGE_ERROR' });
+  await assert.rejects(createSidefx(p).execute({ object: 'capability', verb: 'project', subject: 'example', codegenPatterns: [''] }),
     { code: 'USAGE_ERROR' });
 });
 
