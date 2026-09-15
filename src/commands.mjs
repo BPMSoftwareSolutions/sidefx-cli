@@ -4,6 +4,9 @@ import { bytesDigest } from './data.mjs';
 
 // sfx owns its vocabulary as data, never as code. This module loads and validates that
 // mapping. It knows nothing about capsules, plans, providers or authoring languages.
+// The declared semantic cell altitudes of an observation operation. The terminal
+// reads them to scope its stream; the estate remains the authority for meaning.
+export const OBSERVATION_ALTITUDES = Object.freeze(['scenario', 'mechanic', 'provider', 'physical']);
 const specFields = ['min', 'max', 'query', 'namespace', 'identity', 'view', 'scenarioOperand',
   'input', 'inputType', 'observation', 'observationAltitudes', 'format', 'display', 'wraps', 'status', 'missing', 'description'];
 const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'display', 'input', 'inputType', 'namespace', 'observationAltitudes']);
@@ -136,7 +139,7 @@ export function validateSemanticRequest(request, mapping) {
   requireValue(request.observationAltitudes === undefined || (spec.observation === true
     && Array.isArray(request.observationAltitudes)
     && request.observationAltitudes.length > 0
-    && request.observationAltitudes.every(value => ['scenario', 'mechanic', 'provider', 'physical'].includes(value))),
+    && request.observationAltitudes.every(value => OBSERVATION_ALTITUDES.includes(value))),
   'OPTION_NOT_APPLICABLE', '--observation-altitude applies only to observation operations and names a semantic altitude.', 2);
   requireValue(request.scenario === undefined || spec.scenarioOperand || spec.view === true,
     'OPTION_NOT_APPLICABLE', 'Scenario selection applies to scenario operands and selectable views.', 2);

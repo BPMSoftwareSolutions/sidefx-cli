@@ -37,11 +37,13 @@ class Sidefx {
 
   async execute(request, { onObservation } = {}) {
     request = { ...request };
-    if (request.input !== undefined) {
+    const spec = validateSemanticRequest(request, this.mapping);
+    // A typed-input operation carries the raw scalar; the estate resolves it against
+    // the capability's declaration. Everything else stays canonical JSON.
+    if (request.input !== undefined && spec.inputType !== true) {
       assertJson(request.input);
       request.input = JSON.parse(JSON.stringify(request.input));
     }
-    const spec = validateSemanticRequest(request, this.mapping);
 
     // A command the estate does not yet offer fails as exactly that. sfx never
     // substitutes a local implementation for a missing estate operation.

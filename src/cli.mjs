@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { createSidefx } from './index.mjs';
 import { requireValue, SidefxError, errorRecord } from './errors.mjs';
 import { render, renderObservation } from './render.mjs';
-import { parseSemanticCommand, validateSemanticRequest, semanticCommand } from './commands.mjs';
+import { parseSemanticCommand, validateSemanticRequest, semanticCommand, OBSERVATION_ALTITUDES } from './commands.mjs';
 import { loadConfiguration } from './configuration.mjs';
 
 // Terminal-owned help. The command list comes from the loaded mapping, never from here.
@@ -23,6 +23,9 @@ Options:
   --namespace NAME   Namespace filter, where the operation declares one
   --observation-altitude NAME  Stream only the named semantic altitude (repeatable:
                      scenario, mechanic, provider, physical); observe only
+  --trace            Stream the complete mechanical testimony; observe only.
+                     Without it observe is story-first: only the scenario
+                     altitude and the declared story stream
   --json             Machine-readable JSON; diagnostics remain on stderr
                      (an observable operation streams its telemetry there too)
   --timeout MS       Delivery timeout in milliseconds (default 120000)
@@ -68,6 +71,7 @@ function parseOptions(argv) {
       format: { type: 'string' },
       display: { type: 'boolean' },
       'observation-altitude': { type: 'string', multiple: true },
+      trace: { type: 'boolean' },
       timeout: { type: 'string' }, json: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' },
     } });
@@ -83,6 +87,15 @@ export function parseCommand(argv, mapping) {
   requireValue(values.scenario === undefined || request.scenario === undefined,
     'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
   if (values.scenario !== undefined) request.scenario = values.scenario;
+  // Story first. The terminal's default observation is the scenario altitude; the
+  // declared `observationAltitudes` field is still what scopes the estate stream,
+  // and `--trace` asks for the complete mechanical testimony. An explicit
+  // altitude selection is already a trace of that altitude.
+  const spec = semanticCommand(request.object, request.verb, mapping);
+  requireValue(values.trace === undefined || spec?.observation === true,
+    'OPTION_NOT_APPLICABLE', '--trace applies only to observation operations.', 2);
+  if (spec?.observation === true && values['observation-altitude'] === undefined)
+    request.observationAltitudes = values.trace ? [...OBSERVATION_ALTITUDES] : ['scenario'];
   validateSemanticRequest({ ...request, input: values.input }, mapping);
   return { values, request };
 }
