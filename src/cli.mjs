@@ -158,7 +158,9 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     const result = await sidefx.execute(request, observed ? {
       onObservation(event) { stderr.write(renderObservation(event, json) + '\n'); },
     } : {});
-    stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render(request, result, mapping)}\n`);
+    // `--trace` is a presentation reading, not an estate field: it selects the
+    // hierarchical trace after the story and never leaves the terminal.
+    stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render({ ...request, trace: values.trace }, result, mapping)}\n`);
     return 0;
   } catch (error) {
     if (error.code === 'EPIPE') return 0;

@@ -21,13 +21,16 @@ const duration = value => typeof value === 'number'
 // the capability's own language: scenario, responsibility, mechanic. The address
 // is estate data; only this presentation is the terminal's.
 function semanticLine(when, event) {
+  const mechanic = [event.mechanicId, event.mechanicPath].filter(Boolean).join(' ');
   const label = event.semanticRole === 'SCENARIO_OUTCOME' ? `scenario ${event.scenarioId}`
-    : event.semanticRole === 'MECHANIC' ? `mechanic ${event.mechanicId ?? event.cellId}`
+    : event.semanticRole === 'MECHANIC' ? mechanic || event.cellId
       : event.responsibilityKind === 'invoke-scenario' ? `scenario ${event.childScenarioId ?? event.responsibilityId}`
         : event.responsibilityId ?? event.cellId ?? event.edgeId;
   // An edge is the admission path into the addressed cell, not the cell itself.
-  const mark = typeof event.edgeId === 'string' ? '↳' : event.semanticRole === 'MECHANIC' ? '·' : '✓';
-  return [' ', mark, when, label, duration(event.durationMilliseconds)].filter(Boolean).join(' ');
+  const isEdge = typeof event.edgeId === 'string';
+  const admission = isEdge && typeof event.admissionDisposition === 'string' ? event.admissionDisposition : '';
+  const mark = isEdge ? '↳' : event.semanticRole === 'MECHANIC' ? '·' : '✓';
+  return [' ', mark, when, label, admission, duration(event.durationMilliseconds)].filter(Boolean).join(' ');
 }
 
 // Telemetry is shown as the estate reported it. No field is derived, renamed or
@@ -88,8 +91,111 @@ function storyLines(story, payload, request) {
   return lines.join('\n');
 }
 
+const ABSENT = '(not declared)';
+const fieldValue = text => (typeof text === 'string' && text.trim().length ? text : ABSENT);
+const parseJson = text => { try { return typeof text === 'string' ? JSON.parse(text) : text; } catch { return null; } };
+
+// The canonical story of one capability: the declared feature, user story,
+// experience, scenarios, execution plan, ports and contracts. Every value is
+// retained authority read by the declared `read-capability-meaning` capability;
+// the terminal contributes labels and ordering only.
+function meaningLines(payload, request) {
+  const meaning = payload?.meaning ?? {};
+  const graph = meaning.graphSource ?? {};
+  const documents = new Map((meaning.documents ?? []).map(entry => [entry.entry_id, entry.document]));
+  const authority = parseJson(documents.get('capability.authority.json')) ?? {};
+  const feature = documents.get('capability.feature');
+  const markdown = request?.format === 'markdown';
+  const lines = [];
+  const heading = title => markdown ? ['', `## ${title}`] : ['', title, '-'.repeat(title.length)];
+  const field = (label, text, width = 10) => `${label.padEnd(width)}  ${fieldValue(text)}`;
+  lines.push(`Capability  ${fieldValue(payload?.capabilityId)}`);
+  lines.push(`Namespace   ${fieldValue(meaning.namespaceId)}`);
+  lines.push(`Root        ${fieldValue(meaning.rootScenarioId)}`);
+  lines.push(`View        ${fieldValue(payload?.view)}`);
+  lines.push(`Snapshot    ${fieldValue(payload?.evidence?.snapshotId)}`);
+  if (feature) {
+    lines.push(...heading('Canonical feature'));
+    for (const line of String(feature).split('\n').map(item => item.trimEnd()).filter(line => line.trim().length))
+      lines.push(`  ${line}`);
+  }
+  const userStory = authority.userStory;
+  lines.push(...heading('User story'));
+  if (userStory) {
+    lines.push(field('Actor', userStory.actor, 8));
+    lines.push(field('Intent', userStory.intent, 8));
+    lines.push(field('Outcome', userStory.outcome, 8));
+  } else lines.push(`The estate declares no user story for this capability. ${ABSENT}`);
+  const experience = authority.experience;
+  lines.push(...heading('Experience'));
+  if (experience) {
+    lines.push(field('Actor', experience.actor));
+    lines.push(field('Experience', experience.experienceId));
+    lines.push(field('Promise', experience.promise));
+    lines.push(field('Conditions', (experience.observableConditions ?? []).map(condition => condition.conditionId).join(', ')));
+  } else lines.push(`The estate declares no experience for this capability. ${ABSENT}`);
+  const scenarios = graph.scenarios ?? [];
+  lines.push(...heading(`Scenarios (${scenarios.length})`));
+  for (const scenario of scenarios) {
+    lines.push(`  ${scenario.scenarioId}`);
+    lines.push(`    input    ${fieldValue(scenario.input?.inputId)}  (${fieldValue(scenario.input?.contract?.contractId)})`);
+    lines.push(`    event    ${fieldValue(scenario.event?.eventId)}  (${fieldValue(scenario.event?.executionAuthorityId)})`);
+    lines.push(`    outcome  ${fieldValue(scenario.outcome?.outcomeId)}  (${fieldValue(scenario.outcome?.contract?.contractId)})${scenario.outcome?.terminal ? '  [terminal]' : ''}`);
+  }
+  const authorities = graph.executionAuthorities ?? [];
+  lines.push(...heading(`Execution plan (${authorities.length})`));
+  for (const entry of authorities) {
+    lines.push(`  ${entry.id}  owning ${fieldValue(entry.owningScenarioId)}`);
+    for (const operation of entry.operations ?? [])
+      lines.push(`    ${fieldValue(operation.kind)} -> ${fieldValue(operation.portId ?? operation.scenarioId)}`);
+  }
+  const ports = graph.interfaceAuthority?.portBindings ?? [];
+  lines.push(...heading(`Ports (${ports.length})`));
+  for (const port of ports) lines.push(`  ${port.portId}  ->  ${fieldValue(port.platformCapabilityId)}`);
+  const contracts = Object.keys(graph.contractAuthorities?.contracts ?? {});
+  lines.push(...heading(`Contracts (${contracts.length})`));
+  for (const contractId of contracts) lines.push(`  ${contractId}`);
+  return lines.join('\n');
+}
+
+// The hierarchical trace: the observed cells nested by their planned parent, in
+// execution order. It is the same overlay the story joins; the trace reading
+// keeps the mechanical depth the story collapses.
+function traceLines(overlay) {
+  const children = new Map();
+  for (const cell of overlay?.cells ?? []) {
+    const parent = cell.parentCellId ?? null;
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(cell);
+  }
+  const order = cell => cell.observed?.[0]?.logicalOrder ?? Number.MAX_SAFE_INTEGER;
+  for (const list of children.values()) list.sort((left, right) => order(left) - order(right));
+  const label = cell => {
+    const address = cell.semanticAddress ?? {};
+    if (address.semanticRole === 'SCENARIO_OUTCOME') return `scenario ${address.scenarioId}`;
+    if (address.semanticRole === 'EXECUTION_RESPONSIBILITY') return address.responsibilityId ?? cell.cellId;
+    return [address.mechanicId, address.mechanicPath].filter(Boolean).join(' ') || cell.cellId;
+  };
+  const lines = ['TRACE'];
+  const walk = (parent, depth) => {
+    for (const cell of children.get(parent) ?? []) {
+      const observed = cell.observed?.[0];
+      const mark = observed === undefined ? '—' : observed.disposition === 'completed' ? '✓' : '×';
+      const timing = duration(observed?.durationMilliseconds);
+      lines.push(`${'  '.repeat(depth)}${mark} ${label(cell)}${timing ? `  ${timing}` : ''}`);
+      walk(cell.cellId, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return lines.join('\n');
+}
+
 function format(operation, payload, request) {
-  if (operation === 'observe' && payload?.story) return storyLines(payload.story, payload, request);
+  if (operation === 'reveal' && payload?.meaning) return meaningLines(payload, request);
+  if (operation === 'observe' && payload?.story) {
+    const story = storyLines(payload.story, payload, request);
+    return request?.trace && payload.overlay ? `${story}\n\n${traceLines(payload.overlay)}` : story;
+  }
   if (request?.display && payload?.display) {
     const value = select(payload?.result, payload.display.select);
     return payload.display.as === 'json' ? pretty(value) : safe(String(value ?? ''));
