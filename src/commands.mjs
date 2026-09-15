@@ -5,8 +5,8 @@ import { bytesDigest } from './data.mjs';
 // sfx owns its vocabulary as data, never as code. This module loads and validates that
 // mapping. It knows nothing about capsules, plans, providers or authoring languages.
 const specFields = ['min', 'max', 'query', 'namespace', 'identity', 'view', 'scenarioOperand',
-  'input', 'observation', 'format', 'wraps', 'status', 'missing', 'description'];
-const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'input', 'namespace']);
+  'input', 'inputType', 'observation', 'observationAltitudes', 'format', 'display', 'wraps', 'status', 'missing', 'description'];
+const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'display', 'input', 'inputType', 'namespace', 'observationAltitudes']);
 const reserved = ['constructor', 'prototype', '__proto__'];
 const flag = value => value === undefined || typeof value === 'boolean';
 const name = value => typeof value === 'string' && /^[a-z][a-z0-9-]*$/.test(value) && !reserved.includes(value);
@@ -53,7 +53,7 @@ export async function loadCommandMapping(file) {
         && Object.keys(spec).every(key => specFields.includes(key))
         && Number.isInteger(spec.min) && spec.min >= 0 && spec.min <= 2
         && (spec.max === null ? spec.query === true : Number.isInteger(spec.max) && spec.max >= spec.min && spec.max <= 2)
-        && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input) && flag(spec.observation) && flag(spec.format)
+        && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input) && flag(spec.inputType) && flag(spec.observation) && flag(spec.observationAltitudes) && flag(spec.format) && flag(spec.display)
         && (spec.identity === undefined || Object.hasOwn(identities, spec.identity))
         && (spec.description === undefined || typeof spec.description === 'string'),
       'COMMAND_MAPPING_REJECTED', `Invalid operation: ${object} ${verb}.`, 2);
@@ -127,6 +127,17 @@ export function validateSemanticRequest(request, mapping) {
     'OPTION_NOT_APPLICABLE', '--as applies to operations declaring a selectable view.', 2);
   requireValue(request.format === undefined || spec.format === true,
     'OPTION_NOT_APPLICABLE', '--format applies only to operations declaring a selectable presentation.', 2);
+  requireValue(request.display === undefined || spec.display === true,
+    'OPTION_NOT_APPLICABLE', '--display applies only to operations declaring a display projection.', 2);
+  requireValue(request.inputType === undefined || spec.inputType === true,
+    'OPTION_NOT_APPLICABLE', '--input-type applies only to operations declaring a typed input.', 2);
+  requireValue(request.inputType === undefined || ['json', 'text', 'number', 'boolean'].includes(request.inputType),
+    'USAGE_ERROR', '--input-type must be json, text, number or boolean.', 2);
+  requireValue(request.observationAltitudes === undefined || (spec.observation === true
+    && Array.isArray(request.observationAltitudes)
+    && request.observationAltitudes.length > 0
+    && request.observationAltitudes.every(value => ['scenario', 'mechanic', 'provider', 'physical'].includes(value))),
+  'OPTION_NOT_APPLICABLE', '--observation-altitude applies only to observation operations and names a semantic altitude.', 2);
   requireValue(request.scenario === undefined || spec.scenarioOperand || spec.view === true,
     'OPTION_NOT_APPLICABLE', 'Scenario selection applies to scenario operands and selectable views.', 2);
   requireValue(request.input === undefined || spec.input === true,

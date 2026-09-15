@@ -1,7 +1,6 @@
 import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { createSidefx } from './index.mjs';
-import { readJson } from './data.mjs';
 import { requireValue, SidefxError, errorRecord } from './errors.mjs';
 import { render, renderObservation } from './render.mjs';
 import { parseSemanticCommand, validateSemanticRequest, semanticCommand } from './commands.mjs';
@@ -16,10 +15,14 @@ Options:
   --config FILE      This project's sfx.config.json (default: ./sfx.config.json)
   --estate PATH      Estate with its installed sda-bootstrap (or SIDEFX_ESTATE)
   --input VALUE      Canonical JSON, @file.json, or - for standard input
+  --input-type NAME  Type of a raw input scalar: json (default), text, number, boolean
   --as VIEW          Selectable view, where the operation declares one
   --format NAME      Presentation the operation offers (e.g. markdown)
+  --display          Apply the capability's declared display projection
   --scenario ID      Select a scenario
   --namespace NAME   Namespace filter, where the operation declares one
+  --observation-altitude NAME  Stream only the named semantic altitude (repeatable:
+                     scenario, mechanic, provider, physical); observe only
   --json             Machine-readable JSON; diagnostics remain on stderr
                      (an observable operation streams its telemetry there too)
   --timeout MS       Delivery timeout in milliseconds (default 120000)
@@ -60,8 +63,11 @@ function parseOptions(argv) {
   try {
     return parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
       config: { type: 'string' }, estate: { type: 'string' }, input: { type: 'string' },
+      'input-type': { type: 'string' },
       as: { type: 'string' }, scenario: { type: 'string' }, namespace: { type: 'string' },
       format: { type: 'string' },
+      display: { type: 'boolean' },
+      'observation-altitude': { type: 'string', multiple: true },
       timeout: { type: 'string' }, json: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' },
     } });
@@ -73,7 +79,7 @@ export function parseCommand(argv, mapping) {
   if (values.help || values.version || positionals.length === 0) return { values, help: !values.version, version: values.version };
   if (values.timeout !== undefined) requireValue(/^\d+$/.test(values.timeout) && Number(values.timeout) > 0
     && Number(values.timeout) <= 2_147_483_647, 'INVALID_TIMEOUT', '--timeout must be a positive integer below 2147483648.', 2);
-  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, namespace: values.namespace };
+  const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, display: values.display, inputType: values['input-type'], namespace: values.namespace, observationAltitudes: values['observation-altitude'] };
   requireValue(values.scenario === undefined || request.scenario === undefined,
     'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
   if (values.scenario !== undefined) request.scenario = values.scenario;
@@ -81,10 +87,10 @@ export function parseCommand(argv, mapping) {
   return { values, request };
 }
 
-async function readInput(value, stdin) {
+async function readInput(value, stdin, raw) {
   if (value === undefined) return undefined;
-  if (value.startsWith('@')) return readJson(value.slice(1));
-  if (value === '-') {
+  if (value.startsWith('@')) value = await readFile(value.slice(1), 'utf8');
+  else if (value === '-') {
     const chunks = [];
     let size = 0;
     for await (const chunk of stdin) {
@@ -94,7 +100,10 @@ async function readInput(value, stdin) {
     }
     value = Buffer.concat(chunks).toString('utf8');
   }
-  try { return JSON.parse(value.replace(/^﻿/, '')); } catch (error) {
+  // A typed-input operation carries the raw scalar; the estate maps it into the
+  // contract the capability declares. No JSON parsing, so 'Sidney' needs no quoting.
+  if (raw) return value;
+  try { return JSON.parse(value.replace(/^\uFEFF/, '')); } catch (error) {
     throw new SidefxError('INPUT_JSON_REJECTED', `Input must be valid JSON: ${error.message}`, 2);
   }
 }
@@ -119,7 +128,14 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
       return 0;
     }
     const { values, request } = parsed;
-    request.input = await readInput(values.input, stdin);
+    const operationSpec = semanticCommand(request.object, request.verb, mapping);
+    // A raw scalar is carried only for a typed-input operation and a bare operand;
+    // the '@file' and '-' carriers stay canonical JSON unless a type is named.
+    const carrier = typeof values.input === 'string' && (values.input.startsWith('@') || values.input === '-');
+    const explicitType = values['input-type'];
+    const carryRaw = operationSpec?.inputType === true
+      && (explicitType === undefined ? !carrier : explicitType !== 'json');
+    request.input = await readInput(values.input, stdin, carryRaw);
     const sidefx = factory({ mapping, deliveries: configuration.deliveries, estateRoot: selectedEstate || configuration.estateRoot,
       timeoutMs: values.timeout === undefined ? undefined : Number(values.timeout) });
     // An operation the mapping declares observable streams its telemetry as the
