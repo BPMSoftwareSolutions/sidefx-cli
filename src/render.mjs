@@ -201,12 +201,47 @@ function traceLines(overlay) {
   return lines.join('\n');
 }
 
+const GLYPHS = Object.freeze({ completed: '✓', failed: '×', unobserved: '—' });
+const glyphOf = status => (Object.hasOwn(GLYPHS, status) ? GLYPHS[status] : '');
+const entryBytes = (entry, depth) => `${'  '.repeat(depth)}${glyphOf(entry.status) ? `${glyphOf(entry.status)} ` : ''}${safe(entry.text)}`
+  + (entry.note ? `  (${safe(entry.note)})` : '')
+  + (entry.admission ? ` ${safe(entry.admission)}` : '')
+  + (entry.timing ? `  ${safe(entry.timing)}` : '');
+const treeBytes = (entries, depth) => entries.flatMap(entry =>
+  [entryBytes(entry, depth), ...treeBytes(entry.children ?? [], depth + 1)]);
+const blocks = {
+  heading: (block, as) => as === 'markdown' ? `## ${safe(block.text)}`
+    : `${safe(block.text)}\n${'-'.repeat(safe(block.text).length)}`,
+  field: block => `${safe(block.label)} ${safe(block.value)}${block.note ? `  (${safe(block.note)})` : ''}`,
+  lane: block => [...(block.label ? [safe(block.label)] : []),
+    ...(block.entries ?? []).map(entry => entryBytes(entry, 1))].join('\n'),
+  tree: block => [...(block.label ? [safe(block.label)] : []), ...treeBytes(block.entries ?? [], 0)].join('\n'),
+  list: block => (block.items ?? []).length
+    ? block.items.map(entry => entryBytes(entry, 0)).join('\n') : safe(block.emptyText),
+  display: block => block.as === 'json' ? pretty(block.value) : safe(block.value),
+  line: block => safe(block.text),
+  blank: () => '',
+};
+
+export function emitDocument(document, { as } = {}) {
+  const lines = [];
+  for (const block of document?.blocks ?? []) {
+    if (block && Object.hasOwn(blocks, block.type)) lines.push(blocks[block.type](block, as));
+  }
+  return lines.join('\n');
+}
+
 function format(operation, payload, request) {
-  if (operation === 'reveal' && payload?.meaning) return meaningLines(payload, request);
+  const declared = payload?.display?.document;
   if (operation === 'observe' && payload?.story) {
+    // The declared document owns the reading selection: when it is present the
+    // terminal emits its bytes and never composes a second reading of its own.
+    if (declared) return emitDocument(declared, { as: payload.display.as });
     const story = storyLines(payload.story, payload, request);
     return request?.trace && payload.overlay ? `${story}\n\n${traceLines(payload.overlay)}` : story;
   }
+  if (declared) return emitDocument(declared, { as: payload.display.as });
+  if (operation === 'reveal' && payload?.meaning) return meaningLines(payload, request);
   if (request?.display && payload?.display) {
     const value = select(payload?.result, payload.display.select);
     return payload.display.as === 'json' ? pretty(value) : safe(String(value ?? ''));
