@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { emitDocument, render } from '../src/render.mjs';
+import { emitDocument, render, renderObservation } from '../src/render.mjs';
 import { runCli } from '../src/cli.mjs';
 
 const document = blocks => ({ documentType: 'sfx-display-document.v1', blocks });
@@ -63,6 +63,48 @@ test('an entry prints its declared note, admission and timing after the text', (
     { status: 'failed', text: 'child-port', note: 'child-port.v1', admission: 'admitted', timing: '2 ms' }
   ] }]);
   assert.equal(emitDocument(lane), 'STREAM\n  × child-port  (child-port.v1) admitted  2 ms');
+});
+
+test('a declared display entry frames the observation with the entry status glyph', () => {
+  const observedAt = '2026-01-01T00:00:01.250Z';
+  assert.equal(renderObservation({ observedAt,
+    display: { entry: { status: 'completed', text: 'say-hello-world-port', timing: '0.044 ms' } } }),
+  '  ✓ 00:00:01.250 say-hello-world-port  0.044 ms');
+  assert.equal(renderObservation({ observedAt,
+    display: { entry: { status: 'failed', text: 'child-port', note: 'child-port.v1', timing: '2 ms' } } }),
+  '  × 00:00:01.250 child-port  (child-port.v1)  2 ms');
+  assert.equal(renderObservation({ observedAt,
+    display: { entry: { status: 'unobserved', text: 'provider-call' } } }),
+  '  — 00:00:01.250 provider-call');
+  // The glyph table is terminal-owned: an unrecognised status token prints no glyph.
+  assert.equal(renderObservation({ observedAt,
+    display: { entry: { status: 'constructor', text: 'guarded' } } }),
+  '  00:00:01.250 guarded');
+  // Without observedAt the timestamp slot collapses and the two-space prefix stays.
+  assert.equal(renderObservation({ display: { entry: { status: 'unobserved', text: 'provider-call' } } }),
+    '  — provider-call');
+});
+
+test('an edge entry prints its declared admission in the entry byte order', () => {
+  assert.equal(renderObservation({ observedAt: '2026-01-01T00:00:01.250Z',
+    observationType: 'edge-execution-testimony.v1', edgeId: 'edge:return:say-hello-world',
+    display: { entry: { status: 'completed', text: 'say-hello-world-port', admission: 'admitted', timing: '2 ms' } } }),
+  '  ✓ 00:00:01.250 say-hello-world-port admitted  2 ms');
+});
+
+test('an observation without a declared entry keeps the existing line byte-for-byte', () => {
+  assert.equal(renderObservation({ observedAt: '2026-01-01T00:00:01.250Z', semanticRole: 'EXECUTION_RESPONSIBILITY',
+    responsibilityId: 'build-equity-price-binding-request', durationMilliseconds: 12 }),
+  '  ✓ 00:00:01.250 build-equity-price-binding-request 12 ms');
+  assert.equal(renderObservation({ observedAt: '2026-01-01T00:00:01.250Z', observationType: 'cell-execution-testimony.v1',
+    phase: 'executeDeclaredGraph', scenarioId: 'root', sequence: 2, status: 'observed' }),
+  '  . 00:00:01.250 cell-execution-testimony.v1 executeDeclaredGraph #2 observed');
+});
+
+test('--json observation output is unchanged by a declared entry', () => {
+  const event = { observedAt: '2026-01-01T00:00:01.250Z',
+    display: { entry: { status: 'failed', text: 'child-port' } } };
+  assert.equal(renderObservation(event, true), JSON.stringify({ observation: event }));
 });
 
 test('a lane with an empty label prints only its entries', () => {

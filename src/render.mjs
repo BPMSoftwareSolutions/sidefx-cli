@@ -33,11 +33,19 @@ function semanticLine(when, event) {
   return [' ', mark, when, label, admission, duration(event.durationMilliseconds)].filter(Boolean).join(' ');
 }
 
+// A declared display entry owns the observation's bytes: the estate declares the
+// status token and the text, the terminal renders the glyph and the framing.
+// The entry's byte rules are the document emitter's, so a streamed entry and a
+// printed entry read identically.
+const entryLine = (when, entry) => [' ', glyphOf(entry.status), when, entryBody(entry)].filter(Boolean).join(' ');
+
 // Telemetry is shown as the estate reported it. No field is derived, renamed or
 // inferred here, and an event carrying none of these fields prints as itself.
 export function renderObservation(event, json = false) {
   if (json) return JSON.stringify({ observation: event });
   const when = typeof event?.observedAt === 'string' ? event.observedAt.slice(11, 23) : '';
+  const entry = event?.display?.entry;
+  if (entry && typeof entry === 'object') return safe(entryLine(when, entry));
   if (typeof event?.semanticRole === 'string') return safe(semanticLine(when, event));
   const subject = event?.phase ?? event?.scenarioId ?? event?.stepId ?? '';
   const sequence = Number.isInteger(event?.sequence) ? `#${event.sequence}` : '';
@@ -203,10 +211,11 @@ function traceLines(overlay) {
 
 const GLYPHS = Object.freeze({ completed: '✓', failed: '×', unobserved: '—' });
 const glyphOf = status => (Object.hasOwn(GLYPHS, status) ? GLYPHS[status] : '');
-const entryBytes = (entry, depth) => `${'  '.repeat(depth)}${glyphOf(entry.status) ? `${glyphOf(entry.status)} ` : ''}${safe(entry.text)}`
+const entryBody = entry => `${safe(entry.text)}`
   + (entry.note ? `  (${safe(entry.note)})` : '')
   + (entry.admission ? ` ${safe(entry.admission)}` : '')
   + (entry.timing ? `  ${safe(entry.timing)}` : '');
+const entryBytes = (entry, depth) => `${'  '.repeat(depth)}${glyphOf(entry.status) ? `${glyphOf(entry.status)} ` : ''}${entryBody(entry)}`;
 const treeBytes = (entries, depth) => entries.flatMap(entry =>
   [entryBytes(entry, depth), ...treeBytes(entry.children ?? [], depth + 1)]);
 const blocks = {
