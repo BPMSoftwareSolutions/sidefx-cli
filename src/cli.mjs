@@ -2,7 +2,7 @@ import { parseArgs } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { createSidefx } from './index.mjs';
 import { requireValue, SidefxError, errorRecord } from './errors.mjs';
-import { render, renderObservation } from './render.mjs';
+import { render, renderObservation, createStreamClock } from './render.mjs';
 import { parseSemanticCommand, validateSemanticRequest, semanticCommand, OBSERVATION_ALTITUDES } from './commands.mjs';
 import { loadConfiguration } from './configuration.mjs';
 
@@ -167,9 +167,22 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     // estate reports it. Telemetry is diagnostics: it goes to stderr, never to the
     // result on stdout, and it cannot change the delivered outcome.
     const observed = semanticCommand(request.object, request.verb, mapping)?.observation === true;
-    const result = await sidefx.execute(request, observed ? {
-      onObservation(event) { stderr.write(renderObservation(event, json) + '\n'); },
-    } : {});
+    // The story stream's clock is read from the event times the estate already
+    // reports: each human entry prints the elapsed wall time since the previous
+    // streamed entry, and the completed stream prints its total span. --json
+    // keeps the machine stream exactly as delivered.
+    const streamClock = createStreamClock();
+    let result;
+    try {
+      result = await sidefx.execute(request, observed ? {
+        onObservation(event) { stderr.write(renderObservation(event, json, streamClock.gap(event)) + '\n'); },
+      } : {});
+    } finally {
+      if (observed && !json) {
+        const span = streamClock.total();
+        if (span) stderr.write(`  Σ streamed span ${span}\n`);
+      }
+    }
     // `--trace` is a presentation reading, not an estate field: it selects the
     // hierarchical trace after the story and never leaves the terminal.
     stdout.write(json ? `${JSON.stringify(result, null, 2)}\n` : `${render({ ...request, trace: values.trace }, result, mapping)}\n`);

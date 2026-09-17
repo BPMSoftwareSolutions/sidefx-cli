@@ -14,8 +14,48 @@ function rows(payload) {
   return null;
 }
 
-const duration = value => typeof value === 'number'
-  ? (value >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${value} ms`) : '';
+const scale = value => Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${value} ms`;
+const duration = value => typeof value === 'number' ? scale(value) : '';
+
+// The elapsed wall time between consecutive streamed entries, read from the time
+// each event already carries. The gap is event-to-event time, never the entry's
+// own declared duration: a 0.06 ms entry inside a 5 s gap is exactly the signal.
+// A missing time renders no gap; a clock that steps backwards renders its
+// negative rather than hiding it. No kernel call and no new instrumentation.
+const eventTime = event => {
+  for (const value of [event?.observedAt, event?.completedAt, event?.startedAt]) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return undefined;
+};
+
+export const formatGap = milliseconds => typeof milliseconds === 'number' && Number.isFinite(milliseconds)
+  ? `(${milliseconds < 0 ? '-' : '+'}${scale(Math.abs(milliseconds))})` : '';
+
+// The story stream's clock: one invocation's consecutive streamed entries, so a
+// gap is measured only inside the same process stream. An entry without a time
+// renders no gap and leaves the running clock where it was.
+export function createStreamClock() {
+  let first;
+  let previous;
+  let timed = 0;
+  return {
+    gap(event) {
+      const time = eventTime(event);
+      if (time === undefined) return '';
+      const delta = previous === undefined ? undefined : time - previous;
+      first ??= time;
+      previous = time;
+      timed += 1;
+      return delta === undefined ? '' : formatGap(delta);
+    },
+    total() { return timed > 1 ? scale(previous - first) : ''; }
+  };
+}
 
 // A streamed testimony item that carries its declared semantic address prints in
 // the capability's own language: scenario, responsibility, mechanic. The address
@@ -41,16 +81,23 @@ const entryLine = (when, entry) => [' ', glyphOf(entry.status), when, entryBody(
 
 // Telemetry is shown as the estate reported it. No field is derived, renamed or
 // inferred here, and an event carrying none of these fields prints as itself.
-export function renderObservation(event, json = false) {
+// The gap is the stream clock's reading; it is appended to the human entry and
+// never changes a machine (--json) entry.
+export function renderObservation(event, json = false, gap = '') {
   if (json) return JSON.stringify({ observation: event });
   const when = typeof event?.observedAt === 'string' ? event.observedAt.slice(11, 23) : '';
   const entry = event?.display?.entry;
-  if (entry && typeof entry === 'object') return safe(entryLine(when, entry));
-  if (typeof event?.semanticRole === 'string') return safe(semanticLine(when, event));
-  const subject = event?.phase ?? event?.scenarioId ?? event?.stepId ?? '';
-  const sequence = Number.isInteger(event?.sequence) ? `#${event.sequence}` : '';
-  const line = [when, event?.observationType, subject, sequence, event?.status].filter(Boolean).join(' ');
-  return safe(line.length ? `  . ${line}` : `  . ${pretty(event)}`);
+  let line;
+  if (entry && typeof entry === 'object') line = entryLine(when, entry);
+  else if (typeof event?.semanticRole === 'string') line = semanticLine(when, event);
+  else {
+    const subject = event?.phase ?? event?.scenarioId ?? event?.stepId ?? '';
+    const sequence = Number.isInteger(event?.sequence) ? `#${event.sequence}` : '';
+    const mechanical = [when, event?.observationType, subject, sequence, event?.status].filter(Boolean).join(' ');
+    line = mechanical.length ? `  . ${mechanical}` : `  . ${pretty(event)}`;
+  }
+  const text = safe(line);
+  return gap ? `${text} ${safe(gap)}` : text;
 }
 
 function capabilityLine(item) {
