@@ -274,6 +274,12 @@ test('a circuit render without the declared policy fails instead of using built-
     error => error.code === 'PRESENTATION_POLICY_REQUIRED' && error.exitCode === 4);
   assert.throws(() => renderCircuitObservation(scenarioEvent('first', 4), {}),
     error => error.code === 'PRESENTATION_POLICY_REQUIRED');
+  // A declared policy member the emitter does not interpret is refused rather
+  // than silently ignored or replaced by a built-in.
+  const circuit = extra => render({ object: 'capability', verb: 'observe', format: 'circuit',
+    presentation: { ...policy(), box: { ...policy().box, ...extra } } }, { capabilityId: 'example', overlay }, mapping());
+  assert.throws(() => circuit({ align: 'left' }), error => error.code === 'PRESENTATION_POLICY_INCOMPLETE');
+  assert.throws(() => circuit({ wrap: 'hard' }), error => error.code === 'PRESENTATION_POLICY_INCOMPLETE');
 });
 
 test('a circuit observe streams boxes to stdout in arrival order and never renders the story trace', async t => {

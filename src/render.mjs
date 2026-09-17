@@ -360,7 +360,8 @@ const CIRCUIT = Object.freeze({
 const circuitPolicy = policy => {
   if (!policy || typeof policy !== 'object' || !policy.box || !policy.glyphs
     || !policy.labels?.prefixes || typeof policy.granularity?.detailCellLimit !== 'number'
-    || !policy.connectors || !policy.layout)
+    || !policy.connectors || !policy.layout
+    || typeof policy.box.align !== 'string' || typeof policy.box.wrap !== 'string')
     throw new SidefxError('PRESENTATION_POLICY_REQUIRED',
       'The declared circuit presentation policy is required to render the circuit.', 4);
   return policy;
@@ -469,6 +470,11 @@ function circuitStatusLine(cell, policy) {
 
 function circuitContentLines(cell, context) {
   const policy = context.policy;
+  // The declared wrap rule is interpreted; an undeclared rule is a policy gap,
+  // not a place for the emitter to guess.
+  if (policy.box.wrap !== 'hyphen-preferred')
+    throw new SidefxError('PRESENTATION_POLICY_INCOMPLETE',
+      `The declared circuit presentation wrap rule ${policy.box.wrap} is not interpreted.`, 4);
   const limit = Math.max(1, policy.box.maxColumns - 2);
   const count = context.detailed ? 0 : context.counts.get(cell.cellId) ?? 0;
   const suffix = count ? `  (${count} cell${count === 1 ? '' : 's'})` : '';
@@ -493,6 +499,11 @@ const circuitColumns = (lines, policy) => Math.min(policy.box.maxColumns,
   Math.max(policy.box.minColumns, Math.max(0, ...lines.map(line => line.length)) + 2));
 
 function circuitBox(lines, policy) {
+  // The declared justification is interpreted; an undeclared one is a policy
+  // gap, not a place for the emitter to guess.
+  if (policy.box.align !== 'center')
+    throw new SidefxError('PRESENTATION_POLICY_INCOMPLETE',
+      `The declared circuit presentation alignment ${policy.box.align} is not interpreted.`, 4);
   const columns = circuitColumns(lines, policy);
   const inner = Math.max(1, columns - 2);
   return [
