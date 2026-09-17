@@ -8,8 +8,8 @@ import { bytesDigest } from './data.mjs';
 // reads them to scope its stream; the estate remains the authority for meaning.
 export const OBSERVATION_ALTITUDES = Object.freeze(['scenario', 'mechanic', 'provider', 'physical']);
 const specFields = ['min', 'max', 'query', 'namespace', 'identity', 'view', 'scenarioOperand',
-  'input', 'inputType', 'observation', 'observationAltitudes', 'format', 'display', 'workspace', 'targets', 'fullMechanics', 'codegenPatterns', 'wraps', 'status', 'missing', 'description'];
-const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'display', 'input', 'inputType', 'namespace', 'observationAltitudes', 'workspace', 'targets', 'fullMechanics', 'codegenPatterns']);
+  'input', 'inputType', 'observation', 'observationAltitudes', 'format', 'display', 'workspace', 'targets', 'fullMechanics', 'codegenPatterns', 'objective', 'model', 'wraps', 'status', 'missing', 'description'];
+const requestFields = new Set(['object', 'verb', 'subject', 'other', 'query', 'scenario', 'as', 'format', 'display', 'input', 'inputType', 'namespace', 'observationAltitudes', 'workspace', 'targets', 'fullMechanics', 'codegenPatterns', 'objective', 'model']);
 const reserved = ['constructor', 'prototype', '__proto__'];
 const flag = value => value === undefined || typeof value === 'boolean';
 const name = value => typeof value === 'string' && /^[a-z][a-z0-9-]*$/.test(value) && !reserved.includes(value);
@@ -58,6 +58,7 @@ export async function loadCommandMapping(file) {
         && (spec.max === null ? spec.query === true : Number.isInteger(spec.max) && spec.max >= spec.min && spec.max <= 2)
         && flag(spec.query) && flag(spec.namespace) && flag(spec.view) && flag(spec.scenarioOperand) && flag(spec.input) && flag(spec.inputType) && flag(spec.observation) && flag(spec.observationAltitudes) && flag(spec.format) && flag(spec.display)
         && flag(spec.workspace) && flag(spec.targets) && flag(spec.fullMechanics) && flag(spec.codegenPatterns)
+        && flag(spec.objective) && flag(spec.model)
         && (spec.identity === undefined || Object.hasOwn(identities, spec.identity))
         && (spec.description === undefined || typeof spec.description === 'string'),
       'COMMAND_MAPPING_REJECTED', `Invalid operation: ${object} ${verb}.`, 2);
@@ -137,6 +138,14 @@ export function validateSemanticRequest(request, mapping) {
     'OPTION_NOT_APPLICABLE', '--input-type applies only to operations declaring a typed input.', 2);
   requireValue(request.inputType === undefined || ['json', 'text', 'number', 'boolean'].includes(request.inputType),
     'USAGE_ERROR', '--input-type must be json, text, number or boolean.', 2);
+  requireValue(request.objective === undefined || spec.objective === true,
+    'OPTION_NOT_APPLICABLE', '--objective applies only to operations declaring it.', 2);
+  requireValue(request.objective === undefined || (typeof request.objective === 'string' && request.objective.trim().length > 0),
+    'USAGE_ERROR', '--objective requires a non-empty objective.', 2);
+  requireValue(request.model === undefined || spec.model === true,
+    'OPTION_NOT_APPLICABLE', '--model applies only to operations declaring it.', 2);
+  requireValue(request.model === undefined || (typeof request.model === 'string' && request.model.trim().length > 0),
+    'USAGE_ERROR', '--model requires a name.', 2);
   requireValue(request.observationAltitudes === undefined || (spec.observation === true
     && Array.isArray(request.observationAltitudes)
     && request.observationAltitudes.length > 0
