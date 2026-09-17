@@ -66,66 +66,37 @@ test('the observed story renders declared faces, ordered responsibilities and co
   assert.ok(!bare.includes('344.72'));
 });
 
-test('reveal renders the declared canonical story read by the reader capability', () => {
+test('reveal emits the declared reader document and selects markdown by declared format', () => {
   const payload = {
     capabilityId: 'resolve-equity-market-price-evidence', view: 'meaning',
     evidence: { snapshotId: 'sha256:snapshot' },
-    meaning: {
-      capabilityId: 'resolve-equity-market-price-evidence', namespaceId: 'sidefx:capabilities',
-      rootScenarioId: 'resolve-equity-market-price-evidence',
-      documents: [
-        { entry_id: 'capability.feature', document: 'Feature: Resolve provider-neutral equity market-price evidence\n\n  Scenario: Resolve an equity price observation\n    Given a canonical symbol\n    When the exchange is observed\n    Then canonical evidence is retained' },
-        { entry_id: 'capability.authority.json', document: JSON.stringify({
-          userStory: { actor: 'consumer', intent: 'request observed market-price evidence', outcome: 'receive one canonical outcome' },
-          experience: { actor: 'consumer', experienceId: 'provider-neutral-equity-market-price-evidence.v1', promise: 'one canonical outcome',
-            observableConditions: [{ conditionId: 'canonical-evidence-retained' }] } }) }
-      ],
-      graphSource: {
-        scenarios: [{ scenarioId: 'resolve-equity-market-price-evidence',
-          input: { inputId: 'live-equity-price-request', contract: { contractId: 'live-equity-price-request.v1' } },
-          event: { eventId: 'equity-market-price-evidence-requested', executionAuthorityId: 'resolve-equity-market-price-evidence.v1' },
-          outcome: { outcomeId: 'equity-market-price-evidence', contract: { contractId: 'equity-market-price-evidence.v1' }, terminal: true } }],
-        executionAuthorities: [{ id: 'resolve-equity-market-price-evidence.v1', owningScenarioId: 'resolve-equity-market-price-evidence',
-          operations: [{ kind: 'invoke-port', portId: 'build-equity-price-binding-request' }] }],
-        interfaceAuthority: { portBindings: [{ portId: 'build-equity-price-binding-request', platformCapabilityId: 'sda-authority-transformation-port.v1' }] },
-        contractAuthorities: { contracts: { 'live-equity-price-request.v1': {} } }
-      }
-    }
+    display: { as: 'text', document: { documentType: 'sfx-display-document.v1', blocks: [
+      { type: 'line', text: 'Capability  resolve-equity-market-price-evidence' },
+      { type: 'line', text: 'Root        resolve-equity-market-price-evidence' },
+      { type: 'line', text: 'Snapshot    sha256:snapshot' },
+      { type: 'heading', text: 'Canonical feature' },
+      { type: 'line', text: '  Feature: Resolve provider-neutral equity market-price evidence' },
+      { type: 'heading', text: 'Execution plan (1)' },
+      { type: 'line', text: '    invoke-port -> build-equity-price-binding-request' }
+    ] } }
   };
   const mapping = { commands: { capability: { reveal: Object.freeze({ offered: true, wraps: { operation: 'reveal' } }) } } };
   const text = render({ object: 'capability', verb: 'reveal' }, payload, mapping);
   assert.ok(text.includes('Capability  resolve-equity-market-price-evidence'));
   assert.ok(text.includes('Root        resolve-equity-market-price-evidence'));
   assert.ok(text.includes('Snapshot    sha256:snapshot'));
-  assert.ok(text.includes('Canonical feature'));
-  assert.ok(text.includes('Given a canonical symbol'));
-  assert.ok(text.includes('consumer'));
-  assert.ok(text.includes('canonical-evidence-retained'));
-  assert.ok(text.includes('invoke-port -> build-equity-price-binding-request'));
-  assert.ok(text.includes('build-equity-price-binding-request  ->  sda-authority-transformation-port.v1'));
-  assert.ok(text.includes('live-equity-price-request.v1'));
-  // Markdown is the same declared story in a review-ready shape.
+  assert.ok(text.includes('Canonical feature\n-----------------'));
+  assert.ok(text.includes('Given') === false);
+  assert.ok(text.includes('    invoke-port -> build-equity-price-binding-request'));
+  // Markdown is the same declared document in a review-ready heading style.
   const markdown = render({ object: 'capability', verb: 'reveal', format: 'markdown' }, payload, mapping);
   assert.ok(markdown.includes('## Canonical feature'));
   assert.ok(markdown.includes('## Execution plan (1)'));
-
-  // A selected scenario is reported as a distinct declared fact, with its faces.
-  const selectedPayload = { ...payload, meaning: { ...payload.meaning,
-    selectedScenarioId: 'replay-scaffold-generation',
-    selectedScenario: { scenarioId: 'replay-scaffold-generation', capabilityId: 'generate-executable-capability-scaffold',
-      input: { inputId: 'replay-input', contract: { contractId: 'replay-input.v1' } },
-      event: { eventId: 'replay-requested', executionAuthorityId: 'replay.v1' },
-      outcome: { outcomeId: 'replay-result', contract: { contractId: 'replay-result.v1' }, terminal: false } } } };
-  const selectedText = render({ object: 'capability', verb: 'reveal' }, selectedPayload, mapping);
-  assert.ok(selectedText.includes('Selected    replay-scaffold-generation'));
-  assert.ok(selectedText.includes('Selected scenario (replay-scaffold-generation)'));
-  assert.ok(selectedText.includes('owning capability  generate-executable-capability-scaffold'));
-  assert.ok(selectedText.includes('replay-input.v1'));
-  assert.ok(selectedText.includes('replay-result.v1'));
-  // Selecting the root itself stays the root: no Selected reading is printed.
-  const rootSelected = render({ object: 'capability', verb: 'reveal' }, { ...payload,
-    meaning: { ...payload.meaning, selectedScenarioId: payload.meaning.rootScenarioId } }, mapping);
-  assert.ok(!rootSelected.includes('Selected'));
+  // A reader payload without a declared document is shown verbatim: the
+  // terminal composes no reader reading of its own.
+  const undeclared = render({ object: 'capability', verb: 'reveal' },
+    { capabilityId: 'example', meaning: { graphSource: {} } }, mapping);
+  assert.equal(undeclared, JSON.stringify({ capabilityId: 'example', meaning: { graphSource: {} } }, null, 2));
 });
 
 test('--trace keeps the mechanical depth: the story first, then the observed tree', () => {
