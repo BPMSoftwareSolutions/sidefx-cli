@@ -332,9 +332,301 @@ function agentLines(payload) {
   return lines.join('\n\n');
 }
 
+// --- Circuit view (CV-C1, transitional) -------------------------------------
+// A generic emitter over the observe payload's planned-vs-observed overlay.
+// Boxes are semantic cells — expression and selection sub-cells collapse into
+// their enclosing cell; arrows are planned sequence; selection edges render
+// both planned branches; the declared outcome payload closes the view as
+// evidence. Only the layout is the terminal's: every status and duration is the
+// overlay's own entry, and an unobserved cell renders unobserved, never failed.
+// This emitter retires with render.mjs when the estate declares the bytes.
+
+const CIRCUIT = Object.freeze({
+  topLeft: '┌', topRight: '┐', bottomLeft: '└', bottomRight: '┘',
+  horizontal: '─', vertical: '│', teeDown: '┬', teeUp: '┴', cross: '┼',
+  down: '▼', right: '►', noEffect: '×'
+});
+
+const CIRCUIT_GLYPHS = Object.freeze({ completed: '✓', failed: '×', unobserved: '–' });
+// Above this many semantic cells the view collapses to scenario-level boxes with
+// child counts instead of printing every responsibility cell. The agent lane's
+// 60 semantic cells collapse; the equity capability's 19 stay detailed.
+const CIRCUIT_DETAIL_LIMIT = 30;
+
+const circuitEntry = value => (Array.isArray(value?.observed) ? value.observed[0] : undefined);
+const circuitStatus = value => {
+  const entry = circuitEntry(value);
+  return entry === undefined ? 'unobserved' : entry.disposition === 'completed' ? 'completed' : 'failed';
+};
+const circuitGlyph = status => CIRCUIT_GLYPHS[status] ?? '';
+const circuitAddress = cell => cell.semanticAddress ?? {};
+
+const circuitLabel = cell => {
+  const address = circuitAddress(cell);
+  if ((cell.altitude === 'scenario' || address.semanticRole === 'SCENARIO_OUTCOME') && address.scenarioId)
+    return address.scenarioId;
+  if (address.responsibilityId) return address.responsibilityId;
+  if (cell.altitude === 'provider' || cell.altitude === 'physical') return cell.altitude;
+  const prefix = `cell:${cell.altitude}:`;
+  const identity = String(cell.cellId ?? '');
+  return identity.startsWith(prefix) ? identity.slice(prefix.length) : identity;
+};
+
+// A semantic cell is a scenario, responsibility or provider/physical cell; a
+// cell whose id carries an expression or selection sub-cell belongs to its
+// enclosing cell and never prints its own box.
+const isCircuitCell = cell => ['scenario', 'mechanic', 'provider', 'physical'].includes(cell?.altitude)
+  && typeof cell.cellId === 'string'
+  && !cell.cellId.includes(':expression') && !cell.cellId.includes(':selection');
+
+// Planned order: the execution's own logical order when observed, else the
+// responsibility's declared ordinal, else the overlay's own insertion order.
+const circuitOrder = cell => {
+  const entry = circuitEntry(cell);
+  if (entry && Number.isFinite(entry.logicalOrder)) return entry.logicalOrder;
+  const ordinal = circuitAddress(cell).responsibilityOrdinal;
+  return Number.isInteger(ordinal) ? ordinal : Number.MAX_SAFE_INTEGER;
+};
+
+const pad = (text, width) => `${text}${' '.repeat(Math.max(0, width - text.length))}`;
+const shiftLines = (lines, columns) => lines.map(line => `${' '.repeat(columns)}${line}`);
+
+function circuitBox(content, width) {
+  return [
+    `${CIRCUIT.topLeft}${CIRCUIT.horizontal.repeat(width)}${CIRCUIT.topRight}`,
+    `${CIRCUIT.vertical} ${pad(content, width - 2)} ${CIRCUIT.vertical}`,
+    `${CIRCUIT.bottomLeft}${CIRCUIT.horizontal.repeat(width)}${CIRCUIT.bottomRight}`
+  ];
+}
+
+function circuitContent(cell, context) {
+  const label = circuitLabel(cell);
+  const title = label.toLowerCase() === cell.altitude ? cell.altitude.toUpperCase() : `${cell.altitude.toUpperCase()}  ${label}`;
+  const timing = duration(circuitEntry(cell)?.durationMilliseconds);
+  const count = context.detailed ? 0 : context.counts.get(cell.cellId) ?? 0;
+  const children = count ? `  (${count} cell${count === 1 ? '' : 's'})` : '';
+  return `${title}  ${circuitGlyph(circuitStatus(cell))}${timing ? `  ${timing}` : ''}${children}`;
+}
+
+// The detailed tree: every semantic cell under its planned parent; the summary
+// tree: only scenarios, with their responsibilities summarized by count.
+function circuitChildren(cells) {
+  const children = new Map();
+  const add = (parent, child) => {
+    if (!children.has(parent)) children.set(parent, []);
+    children.get(parent).push(child);
+  };
+  for (const cell of cells) if (cell.parentCellId) add(cell.parentCellId, cell);
+  const hosts = cells.filter(cell => circuitAddress(cell).responsibilityKind === 'invoke-scenario');
+  for (const scenario of cells) {
+    if (scenario.altitude !== 'scenario') continue;
+    const parentScenarioId = circuitAddress(scenario).parentScenarioId;
+    if (!parentScenarioId) continue;
+    const host = hosts.find(cell => circuitAddress(cell).scenarioId === parentScenarioId
+      && circuitAddress(cell).responsibilityId === circuitAddress(scenario).scenarioId);
+    if (host) add(host.cellId, scenario);
+  }
+  for (const list of children.values()) list.sort((left, right) => circuitOrder(left) - circuitOrder(right));
+  return children;
+}
+
+function circuitScenarioChildren(cells) {
+  const children = new Map();
+  const scenarios = new Map(cells.filter(cell => cell.altitude === 'scenario')
+    .map(cell => [circuitAddress(cell).scenarioId, cell]));
+  for (const cell of cells) {
+    if (cell.altitude !== 'scenario') continue;
+    const parent = scenarios.get(circuitAddress(cell).parentScenarioId);
+    if (!parent) continue;
+    if (!children.has(parent.cellId)) children.set(parent.cellId, []);
+    children.get(parent.cellId).push(cell);
+  }
+  for (const list of children.values()) list.sort((left, right) => circuitOrder(left) - circuitOrder(right));
+  return children;
+}
+
+// Selection edges are the only branches: every other edge is the sequence the
+// detailed tree already walks. A variant is selected only when its own observed
+// admission says admitted; both planned branches always render.
+function circuitRoutes(edges, cellsById) {
+  const routes = new Map();
+  for (const edge of edges ?? []) {
+    if (edge?.kind !== 'selection') continue;
+    const source = cellsById.get(edge.planned?.from?.cellId);
+    const target = cellsById.get(edge.planned?.to?.cellId);
+    if (!source || !target) continue;
+    if (!routes.has(source.cellId)) routes.set(source.cellId, []);
+    const entry = circuitEntry(edge);
+    routes.get(source.cellId).push({
+      variant: edge.planned?.selectsVariant ?? edge.edgeId ?? 'selection',
+      admitted: entry?.admissionDisposition === 'admitted',
+      order: entry && Number.isFinite(entry.logicalOrder) ? entry.logicalOrder : Number.MAX_SAFE_INTEGER,
+      target
+    });
+  }
+  return routes;
+}
+
+// A scenario's child count sums the semantic cells whose nearest enclosing
+// scenario is that scenario; a child scenario's own cells count under it.
+function circuitCounts(cells) {
+  const byId = new Map(cells.map(cell => [cell.cellId, cell]));
+  const counts = new Map();
+  for (const cell of cells) {
+    if (cell.altitude === 'scenario') continue;
+    let parent = cell.parentCellId;
+    while (parent) {
+      const enclosing = byId.get(parent);
+      if (!enclosing) break;
+      if (enclosing.altitude === 'scenario') {
+        counts.set(enclosing.cellId, (counts.get(enclosing.cellId) ?? 0) + 1);
+        break;
+      }
+      parent = enclosing.parentCellId;
+    }
+  }
+  return counts;
+}
+
+const circuitRow = (positions, glyph, length) => {
+  const row = Array.from({ length }, () => ' ');
+  for (const position of positions) row[position] = glyph;
+  return row.join('').replace(/\s+$/, '');
+};
+
+const circuitWidth = content => Math.max(30, content.length + 2);
+const insertAt = (line, position, glyph) => `${line.slice(0, position)}${glyph}${line.slice(position)}`;
+
+// The box of one cell and everything the plan puts under it. Provider and
+// physical cells indent one step by altitude; every other cell keeps the
+// chain's column. Routes render both planned branches, and the admitted
+// target's subtree continues beneath its own column. When a route leaves a
+// cell that also has children, a rail carries the source's line down the
+// left of the children and back into the branch.
+function circuitNode(cell, context, columns = 0) {
+  const content = circuitContent(cell, context);
+  const lines = shiftLines(circuitBox(content, circuitWidth(content)), columns);
+  if (context.visited.has(cell.cellId)) return lines;
+  context.visited.add(cell.cellId);
+  return [...lines, ...circuitBody(cell, context, columns)];
+}
+
+function circuitBody(cell, context, columns) {
+  const tree = context.detailed ? context.children : context.scenarioChildren;
+  const entries = [];
+  for (const child of tree.get(cell.cellId) ?? []) {
+    if (context.visited.has(child.cellId)) continue;
+    entries.push({ order: circuitOrder(child), child });
+  }
+  const group = context.routes.get(cell.cellId);
+  if (group) entries.push({
+    order: group.reduce((order, variant) => Math.min(order, variant.order), Number.MAX_SAFE_INTEGER), group
+  });
+  entries.sort((left, right) => left.order - right.order);
+  const rail = Boolean(group) && entries.some(entry => entry.child);
+  const lines = [];
+  for (const entry of entries) {
+    if (entry.child) {
+      const depth = entry.child.altitude === 'provider' || entry.child.altitude === 'physical' ? 2 : 0;
+      const childColumns = columns + (rail ? 1 : 0) + depth;
+      const center = childColumns + Math.floor(circuitWidth(circuitContent(entry.child, context)) / 2);
+      const block = [`${' '.repeat(center)}${CIRCUIT.vertical}`, `${' '.repeat(center)}${CIRCUIT.down}`,
+        ...circuitNode(entry.child, context, childColumns)];
+      for (const line of block) lines.push(rail ? insertAt(line, columns, CIRCUIT.vertical) : line);
+    } else {
+      const branch = circuitBranch(entry.group, context, columns, circuitWidth(circuitContent(cell, context)), rail);
+      lines.push(...branch.lines);
+      if (branch.selected) lines.push(...circuitBody(branch.selected.target, context, branch.selected.columns));
+    }
+  }
+  return lines;
+}
+
+function circuitBranch(group, context, columns, sourceWidth, rail) {
+  const gap = 5;
+  const variants = group.map(variant => {
+    const label = variant.admitted
+      ? `${CIRCUIT.right} ${variant.variant}`
+      : `${CIRCUIT.noEffect} ${variant.variant}  NO EFFECT`;
+    const content = circuitContent(variant.target, context);
+    const box = circuitBox(content, circuitWidth(content));
+    const fresh = !context.visited.has(variant.target.cellId);
+    if (fresh) context.visited.add(variant.target.cellId);
+    return { variant, label, box, fresh, width: Math.max(...box.map(line => line.length), label.length) };
+  });
+  const offsets = [];
+  let cursor = 0;
+  for (const entry of variants) { offsets.push(cursor); cursor += entry.width + gap; }
+  const total = cursor - gap;
+  const centers = variants.map((entry, index) => offsets[index] + Math.floor(entry.width / 2));
+  const source = columns + Math.floor(sourceWidth / 2);
+  const margin = Math.max(0, source - Math.floor(total / 2));
+  const shifted = centers.map(center => center + margin);
+  const left = Math.min(rail ? columns : source, shifted[0]);
+  const right = Math.max(rail ? columns : source, shifted[shifted.length - 1]);
+  const fan = Array.from({ length: right + 1 }, () => ' ');
+  for (let column = left + 1; column < right; column += 1) fan[column] = CIRCUIT.horizontal;
+  fan[left] = CIRCUIT.topLeft;
+  fan[right] = CIRCUIT.topRight;
+  for (const center of shifted) if (center > left && center < right) fan[center] = CIRCUIT.teeDown;
+  if (rail) {
+    fan[columns] = columns === left ? CIRCUIT.bottomLeft : columns === right ? CIRCUIT.bottomRight : CIRCUIT.teeUp;
+    if (shifted.includes(columns)) fan[columns] = CIRCUIT.cross;
+  } else if (source === left) {
+    fan[left] = CIRCUIT.teeDown;
+  } else if (source === right) {
+    fan[right] = CIRCUIT.teeDown;
+  } else if (source > left && source < right) {
+    fan[source] = fan[source] === CIRCUIT.horizontal ? CIRCUIT.teeUp : CIRCUIT.cross;
+  }
+  const labelRow = Array.from({ length: right + 1 }, () => ' ');
+  variants.forEach((entry, index) => {
+    const start = Math.max(0, shifted[index] - Math.floor(entry.label.length / 2));
+    for (let position = 0; position < entry.label.length; position += 1) labelRow[start + position] = entry.label[position];
+  });
+  const lines = [];
+  if (!rail) lines.push(`${' '.repeat(source)}${CIRCUIT.vertical}`);
+  lines.push(fan.join('').replace(/\s+$/, ''),
+    circuitRow(shifted, CIRCUIT.vertical, right + 1),
+    labelRow.join('').replace(/\s+$/, ''),
+    circuitRow(shifted, CIRCUIT.down, right + 1));
+  const height = Math.max(...variants.map(entry => entry.box.length));
+  for (let index = 0; index < height; index += 1) {
+    lines.push(`${' '.repeat(margin)}${variants.map(entry => pad(entry.box[index] ?? '', entry.width)).join(' '.repeat(gap))}`.replace(/\s+$/, ''));
+  }
+  const selectedIndex = group.findIndex(variant => variant.admitted);
+  return {
+    lines,
+    selected: selectedIndex === -1 || !variants[selectedIndex].fresh ? null
+      : { target: group[selectedIndex].target, columns: margin + offsets[selectedIndex] }
+  };
+}
+
+export function circuitView(overlay, payload, request) {
+  const cells = (overlay?.cells ?? []).filter(isCircuitCell);
+  if (!cells.length) return pretty(payload ?? overlay ?? {});
+  const counts = circuitCounts(cells);
+  const detailed = cells.length <= CIRCUIT_DETAIL_LIMIT;
+  const routes = circuitRoutes(overlay?.edges ?? [], new Map(cells.map(cell => [cell.cellId, cell])));
+  const context = { detailed, counts, routes, children: circuitChildren(cells), scenarioChildren: circuitScenarioChildren(cells), visited: new Set() };
+  const targets = new Set();
+  for (const group of routes.values()) for (const variant of group) targets.add(variant.target.cellId);
+  const roots = cells.filter(cell => cell.altitude === 'scenario'
+    && !circuitAddress(cell).parentScenarioId && !targets.has(cell.cellId))
+    .sort((left, right) => circuitOrder(left) - circuitOrder(right));
+  const lines = [`CIRCUIT  ${payload?.capabilityId ?? overlay?.graphId ?? ''}`.trimEnd()];
+  for (const root of roots) lines.push(...circuitNode(root, context));
+  for (const cell of cells) if (cell.altitude === 'scenario' && !context.visited.has(cell.cellId)) lines.push(...circuitNode(cell, context));
+  const evidence = payload?.result?.outcome?.payload;
+  if (evidence !== undefined) lines.push('', `EVIDENCE  ${JSON.stringify(evidence)}`);
+  return lines.join('\n');
+}
+
 function format(operation, payload, request) {
   const declared = payload?.display?.document;
   if (operation === 'agent-invoke') return agentLines(payload);
+  if (operation === 'observe' && request?.format === 'circuit' && payload?.overlay)
+    return circuitView(payload.overlay, payload, request);
   if (operation === 'observe' && payload?.story) {
     // The declared document owns the reading selection: when it is present the
     // terminal emits its bytes and never composes a second reading of its own.

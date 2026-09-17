@@ -17,7 +17,7 @@ Options:
   --input VALUE      Canonical JSON, @file.json, or - for standard input
   --input-type NAME  Type of a raw input scalar: json (default), text, number, boolean
   --as VIEW          Selectable view, where the operation declares one
-  --format NAME      Presentation the operation offers (e.g. markdown)
+  --format NAME      Presentation the operation offers (e.g. markdown, circuit)
   --display          Apply the capability's declared display projection
   --scenario ID      Select a scenario
   --namespace NAME   Namespace filter, where the operation declares one
