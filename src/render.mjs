@@ -240,8 +240,54 @@ export function emitDocument(document, { as } = {}) {
   return lines.join('\n');
 }
 
+// The agent lane frames two real governed receipts: the model provider's
+// proposal and the capability lane's resolution/execution or absence. The frame
+// prints the receipts as delivered; it derives no status and hides no refusal.
+function agentLines(payload) {
+  const agent = payload?.agentLane ?? {};
+  const provider = [agent.provider, agent.model ? `(${agent.model})` : null].filter(Boolean).join(' ');
+  const modelRows = [
+    `provider    ${safe(provider)}`,
+    `capability  ${safe(agent.capability)}  ${safe(agent.disposition)}`,
+    agent.proposal ? `proposal    ${safe(agent.proposal.capability)}  input ${safe(agent.proposal.input)}` : 'proposal    none'
+  ];
+  const resolution = payload?.resolution;
+  const resolutionRows = [resolution?.capability
+    ? `capability  ${safe(resolution.capability)}  ${resolution.declared ? 'declared' : 'not declared'}`
+    : 'capability  none'];
+  const lines = [
+    section('SIDEFX  agent execution', `objective   ${safe(payload?.objective)}`),
+    section('MODEL PROVIDER (agent lane)', modelRows.join('\n')),
+    section('SIDEFX (resolution lane)', resolutionRows.join('\n'))
+  ];
+  if (payload?.executionLane) {
+    const execution = payload.executionLane;
+    const rows = [`capability  ${safe(execution.capability)}`, `disposition ${safe(execution.disposition)}`];
+    for (const [key, value] of Object.entries(execution.outcome ?? {})) {
+      if (value === null || ['string', 'number'].includes(typeof value)) {
+        const text = key === 'observedPrice' && execution.outcome?.currency !== undefined
+          ? `${value} ${execution.outcome.currency}` : `${value}`;
+        rows.push(`${key.padEnd(11)} ${safe(text)}`);
+      }
+    }
+    if (execution.providerTestimony) rows.push(`provider    ${safe(execution.providerTestimony.providerId ?? execution.providerTestimony.bindingId)}`);
+    lines.push(section('EXECUTION LANE', rows.join('\n')));
+  } else if (payload?.refusal) {
+    lines.push(section('NO EXECUTABLE PATH', `${safe(payload.refusal)}\nno provider reached; no effect`));
+  }
+  const receipt = payload?.receipt ?? {};
+  lines.push(section('AGENCY RECEIPT', [
+    `requested ${receipt.requested ?? 0}   executed ${receipt.executed ?? 0}   refused ${receipt.refused ?? 0}`,
+    `providers reached ${receipt.executionProviderReached ?? 0} (execution), ${receipt.modelProviderReached ?? 0} (model)`,
+    `wall ${duration(receipt.wallMilliseconds)}`,
+    payload?.receiptNote ? `note ${safe(payload.receiptNote)}` : ''
+  ].filter(Boolean).join('\n')));
+  return lines.join('\n\n');
+}
+
 function format(operation, payload, request) {
   const declared = payload?.display?.document;
+  if (operation === 'agent-invoke') return agentLines(payload);
   if (operation === 'observe' && payload?.story) {
     // The declared document owns the reading selection: when it is present the
     // terminal emits its bytes and never composes a second reading of its own.
