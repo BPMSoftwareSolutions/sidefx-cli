@@ -5,19 +5,46 @@ import os from 'node:os';
 import path from 'node:path';
 import { render, renderCircuitObservation } from '../src/render.mjs';
 import { runCli } from '../src/cli.mjs';
+import { SidefxError } from '../src/errors.mjs';
 
 const mapping = extra => ({ commands: { capability: {
   observe: Object.freeze({ min: 1, max: 1, input: true, observation: true, format: true, offered: true,
     wraps: { operation: 'observe' }, ...extra }) } } });
 
+// The declared policy fixture. Every metric, glyph and connector the emitter
+// interprets comes from here; the emitter carries no built-in values.
+const policy = () => ({
+  policyType: 'circuit-presentation.v1',
+  box: { minColumns: 20, maxColumns: 40, minRows: 2, align: 'center', wrap: 'hyphen-preferred' },
+  glyphs: { success: '✓', failure: '×', unobserved: '–', arrow: '▼', fork: '┬', rail: '│' },
+  statusRow: { enabled: true, format: 'glyph duration' },
+  labels: { prefixes: { scenario: 'SCENARIO', mechanic: 'MECHANIC', provider: 'PROVIDER', physical: 'PHYSICAL' } },
+  granularity: { detailCellLimit: 30 },
+  connectors: { rail: '│', arrow: '▼', fork: '┬', labelAbove: true },
+  layout: { stableIndent: true }
+});
+
+// A stub policy with different metrics, glyphs, prefixes and connectors: the
+// emitted output must change with it (policy-driven behavior).
+const stubPolicy = () => ({
+  policyType: 'circuit-presentation.v1',
+  box: { minColumns: 24, maxColumns: 64, minRows: 2, align: 'center', wrap: 'hyphen-preferred' },
+  glyphs: { success: 'OK', failure: 'ERR', unobserved: '?', arrow: 'v', fork: '+', rail: '|' },
+  statusRow: { enabled: true, format: 'glyph duration' },
+  labels: { prefixes: { scenario: 'S', mechanic: 'M', provider: 'P', physical: 'F' } },
+  granularity: { detailCellLimit: 5 },
+  connectors: { rail: '|', arrow: 'v', fork: '+', labelAbove: false },
+  layout: { stableIndent: false }
+});
+
 const cell = (cellId, parentCellId, altitude, semanticAddress, observed) =>
   ({ cellId, parentCellId, altitude, semanticAddress, observed });
-const entry = (durationMilliseconds, logicalOrder, disposition = 'completed') =>
-  ({ disposition, durationMilliseconds, logicalOrder });
-const scenarioEvent = (scenarioId, durationMilliseconds, status = 'completed') => ({
+const entry = (durationMilliseconds, logicalOrder, outcomeClassification = 'success') =>
+  ({ outcomeClassification, durationMilliseconds, logicalOrder });
+const scenarioEvent = (scenarioId, durationMilliseconds, entryStatus = 'completed') => ({
   observationType: 'cell-execution-testimony.v1', cellId: `cell:scenario:${scenarioId}`, cellAltitude: 'scenario',
   scenarioId, semanticRole: 'SCENARIO_OUTCOME', durationMilliseconds,
-  display: { entry: { status, text: `scenario ${scenarioId}`, timing: `${durationMilliseconds} ms` } }
+  display: { entry: { status: entryStatus, text: `scenario ${scenarioId}`, timing: `${durationMilliseconds} ms` } }
 });
 
 async function project(t) {
@@ -26,9 +53,13 @@ async function project(t) {
   await fs.writeFile(path.join(root, 'commands.json'), JSON.stringify({
     mappingType: 'sfx-command-mapping.v1',
     identities: { capability: { pattern: '^[a-z][a-z0-9.-]*$', message: 'Supply a capability identity.' } },
-    surfaces: { estate: { capabilityId: 'deliver-estate', request: 'estate-request.v1', operations: ['observe'] } },
-    commands: { capability: { observe: { min: 1, max: 1, identity: 'capability', input: true, observation: true, format: true,
-      wraps: { surface: 'estate', operation: 'observe' } } } }
+    surfaces: { estate: { capabilityId: 'deliver-estate', request: 'estate-request.v1', operations: ['observe', 'invoke'] } },
+    commands: { capability: {
+      observe: { min: 1, max: 1, identity: 'capability', input: true, observation: true, format: true,
+        wraps: { surface: 'estate', operation: 'observe' } },
+      invoke: { min: 1, max: 1, identity: 'capability', input: true, inputType: true,
+        wraps: { surface: 'estate', operation: 'invoke' } }
+    } }
   }));
   const configFile = path.join(root, 'sfx.config.json');
   await fs.writeFile(configFile, JSON.stringify({ configurationType: 'sfx-project.v1', commands: 'commands.json' }));
@@ -69,21 +100,28 @@ test('the circuit renders semantic boxes, collapses expression cells and keeps t
         responsibilityKind: 'invoke-port', responsibilityOrdinal: 1 }, [entry(3, 1)]),
     cell('cell:mechanic:example.operation.1:expression', 'cell:mechanic:example.operation.1', 'mechanic',
       { scenarioId: 'example', semanticRole: 'MECHANIC', mechanicId: 'object' }, [entry(2, 2)]),
-    cell('cell:provider:example.operation.1', 'cell:mechanic:example.operation.1', 'provider', null, [entry(9, 2, 'failed')]),
+    cell('cell:provider:example.operation.1', 'cell:mechanic:example.operation.1', 'provider', null, [entry(9, 2, 'failure')]),
     cell('cell:physical:example.operation.1', 'cell:provider:example.operation.1', 'physical', null, []),
     cell('cell:mechanic:example.operation.2', 'cell:scenario:example', 'mechanic',
       { scenarioId: 'example', semanticRole: 'EXECUTION_RESPONSIBILITY', responsibilityId: 'never-ran-port',
         responsibilityKind: 'invoke-port', responsibilityOrdinal: 2 }, [])
   ] };
   const payload = { capabilityId: 'example', overlay, result: { outcome: { payload: { message: 'Hello, World!' } } } };
-  const text = render({ object: 'capability', verb: 'observe', format: 'circuit' }, payload, mapping());
+  const text = render({ object: 'capability', verb: 'observe', format: 'circuit', presentation: policy() }, payload, mapping());
   assert.ok(text.startsWith('CIRCUIT  example'));
-  assert.ok(text.includes('SCENARIO  example  ✓  12 ms'));
-  assert.ok(text.includes('MECHANIC  first-port  ✓  3 ms'));
+  // Label and status are separate centered rows; the label wraps inside the
+  // minimum width and the status row carries the declared glyph with the
+  // duration verbatim.
+  assert.ok(text.includes('SCENARIO  example'));
+  assert.ok(text.includes('✓ 12 ms'));
+  assert.ok(text.includes('│ MECHANIC  first-port │'), text);
+  assert.ok(text.includes('✓ 3 ms'));
   // A failed cell and an unobserved cell are distinct: × is testimony, – is absence.
-  assert.ok(text.includes('PROVIDER  ×  9 ms'));
-  assert.ok(text.includes('PHYSICAL  –'));
-  assert.ok(text.includes('MECHANIC  never-ran-port  –'));
+  assert.ok(text.includes('PROVIDER'));
+  assert.ok(text.includes('× 9 ms'));
+  assert.ok(text.includes('PHYSICAL'));
+  assert.ok(text.includes('–'));
+  assert.ok(text.includes('never-ran-port'));
   // The expression sub-cell collapses into its enclosing responsibility.
   assert.ok(!text.includes('object'));
   assert.ok(!text.includes(':expression'));
@@ -91,16 +129,18 @@ test('the circuit renders semantic boxes, collapses expression cells and keeps t
 });
 
 test('selection edges render both planned branches: the admitted one lit, the refused one NO EFFECT', () => {
-  const text = render({ object: 'capability', verb: 'observe', format: 'circuit' }, branchPayload(), mapping());
+  const text = render({ object: 'capability', verb: 'observe', format: 'circuit', presentation: policy() }, branchPayload(), mapping());
   assert.ok(text.includes('► ADMITTED'));
   assert.ok(text.includes('× REFUSED  NO EFFECT'));
-  assert.ok(text.includes('SCENARIO  admitted-target  ✓  5 ms'));
-  assert.ok(text.includes('SCENARIO  refused-target  –'));
+  assert.ok(text.includes('admitted-target'));
+  assert.ok(text.includes('✓ 5 ms'));
+  assert.ok(text.includes('refused-target'));
+  assert.ok(text.includes('–'));
   assert.ok(text.endsWith('EVIDENCE  {"symbol":"AVGO"}'));
 });
 
 test('the streamed closing frame prints only the selection branches and the evidence', () => {
-  const text = render({ object: 'capability', verb: 'observe', format: 'circuit', streamedCircuit: true },
+  const text = render({ object: 'capability', verb: 'observe', format: 'circuit', streamedCircuit: true, presentation: policy() },
     branchPayload(), mapping());
   assert.ok(text.includes('BRANCH  root'));
   assert.ok(text.includes('► ADMITTED'));
@@ -114,10 +154,11 @@ test('the streamed closing frame prints only the selection branches and the evid
 });
 
 test('the circuit stream prints one box per arrived semantic component, in arrival order, and skips sub-cells', () => {
-  const state = {};
+  const state = { policy: policy() };
   const first = renderCircuitObservation(scenarioEvent('first', 4), state);
-  assert.equal(first.split('\n').length, 3);
-  assert.ok(first.includes('SCENARIO  first  ✓  4 ms'));
+  assert.equal(first.split('\n').length, 4);
+  assert.ok(first.split('\n').includes('│  SCENARIO  first   │'));
+  assert.ok(first.split('\n').includes('│       ✓ 4 ms       │'));
   // An expression sub-cell belongs to its enclosing component: nothing prints.
   assert.equal(renderCircuitObservation({ observationType: 'cell-execution-testimony.v1',
     cellId: 'cell:mechanic:first.operation.1:expression.fields.x', cellAltitude: 'mechanic', durationMilliseconds: 1,
@@ -128,17 +169,28 @@ test('the circuit stream prints one box per arrived semantic component, in arriv
   const second = renderCircuitObservation(scenarioEvent('second', 6000, 'failed'), state);
   assert.ok(second.startsWith(' '));
   assert.ok(second.includes('▼'));
-  assert.ok(second.includes('SCENARIO  second  ×  6.00 s'));
-  // The declared outcome classification settles the glyph before the mechanical
-  // disposition: a classified failure inside a completed cell is an ×.
+  assert.ok(second.includes('SCENARIO  second'));
+  assert.ok(second.includes('× 6.00 s'));
+  // The declared outcome classification settles the glyph before the declared
+  // display entry: a classified failure inside a completed entry is an ×.
   const classified = renderCircuitObservation({ observationType: 'cell-execution-testimony.v1',
     cellId: 'cell:provider:first.operation.1', cellAltitude: 'provider', durationMilliseconds: 2,
-    disposition: 'completed', outcomeClassification: 'failure' }, state);
-  assert.ok(classified.includes('PROVIDER  ×  2 ms'));
-  // With no status-bearing field at all the component is unobserved, never failed.
+    outcomeClassification: 'failure', display: { entry: { status: 'completed' } } }, state);
+  assert.ok(classified.includes('PROVIDER'));
+  assert.ok(classified.includes('× 2 ms'));
+  // The estate's declared display-entry status is the stream's classification
+  // token (completed/failed); the mechanical disposition is not classification
+  // and never lights or fails a box.
+  const declared = renderCircuitObservation({ observationType: 'cell-execution-testimony.v1',
+    cellId: 'cell:provider:second.operation.1', cellAltitude: 'provider', durationMilliseconds: 2,
+    display: { entry: { status: 'completed' } } }, state);
+  assert.ok(declared.includes('✓ 2 ms'));
   const absent = renderCircuitObservation({ observationType: 'cell-execution-testimony.v1',
-    cellId: 'cell:physical:first.operation.1', cellAltitude: 'physical' }, state);
-  assert.ok(absent.includes('PHYSICAL  –'));
+    cellId: 'cell:physical:first.operation.1', cellAltitude: 'physical',
+    disposition: 'completed' }, state);
+  assert.ok(absent.includes('PHYSICAL'));
+  assert.ok(absent.includes('–'));
+  assert.ok(!absent.includes('✓'));
 });
 
 test('a large graph collapses to scenario-level boxes with child counts', () => {
@@ -151,8 +203,10 @@ test('a large graph collapses to scenario-level boxes with child counts', () => 
       { semanticRole: 'SCENARIO_OUTCOME', scenarioId: 'big' }, [entry(50, 100)]),
     ...responsibilities
   ] };
-  const text = render({ object: 'capability', verb: 'observe', format: 'circuit' }, { capabilityId: 'big', overlay }, mapping());
-  assert.ok(text.includes('SCENARIO  big  ✓  50 ms  (40 cells)'));
+  const text = render({ object: 'capability', verb: 'observe', format: 'circuit', presentation: policy() },
+    { capabilityId: 'big', overlay }, mapping());
+  assert.ok(text.includes('(40 cells)'));
+  assert.ok(text.includes('✓ 50 ms'));
   assert.ok(!text.includes('big-port-1'));
 });
 
@@ -167,9 +221,65 @@ test('the circuit format changes no other reading: a payload without an overlay 
   'DECLARED STORY');
 });
 
+test('the circuit geometry is interpreted from the policy: a stub policy changes every metric and glyph', () => {
+  const long = 'cell:mechanic:example.operation.1';
+  const overlay = { cells: [
+    cell('cell:scenario:example', null, 'scenario',
+      { semanticRole: 'SCENARIO_OUTCOME', scenarioId: 'example' }, [entry(12, 4)]),
+    cell(long, 'cell:scenario:example', 'mechanic',
+      { scenarioId: 'example', semanticRole: 'EXECUTION_RESPONSIBILITY',
+        responsibilityId: 'a-very-long-responsibility-identifier-forced-to-wrap',
+        responsibilityKind: 'invoke-port', responsibilityOrdinal: 1 }, [entry(3, 1)]),
+    cell('cell:provider:example.operation.1', 'cell:mechanic:example.operation.1', 'provider', null, [entry(9, 9, 'failure')])
+  ] };
+  const payload = { capabilityId: 'example', overlay };
+  const declared = render({ object: 'capability', verb: 'observe', format: 'circuit', presentation: policy() }, payload, mapping());
+  const stub = render({ object: 'capability', verb: 'observe', format: 'circuit', presentation: stubPolicy() }, payload, mapping());
+  assert.notEqual(declared, stub);
+  // Declared: bars never exceed the declared maximum (40), labels never exceed
+  // its text limit (38), the hyphen-preferred wrap breaks the long id.
+  for (const line of declared.split('\n')) assert.ok(line.length <= 42, `${line.length}: ${line}`);
+  assert.ok(declared.includes('a-very-long-responsibility-identifier-'));
+  assert.ok(declared.includes('│ SCENARIO  example  │'), declared);
+  assert.ok(declared.includes('SCENARIO  example'));
+  assert.ok(declared.includes('✓ 12 ms'));
+  assert.ok(declared.includes('× 9 ms'));
+  // Stub: its own columns, prefixes, glyphs and connectors.
+  for (const line of stub.split('\n')) assert.ok(line.length <= 66, `${line.length}: ${line}`);
+  assert.ok(stub.includes('S  example') || stub.includes('S  example  '));
+  assert.ok(stub.includes('OK 12 ms'));
+  assert.ok(stub.includes('ERR 9 ms'));
+  assert.ok(stub.includes('M  a-very-long-responsibility-identifier-forced-to-wrap')
+    || stub.includes('a-very-long-responsibility-identifier-forced-to-wrap'));
+  assert.ok(!stub.includes('SCENARIO'));
+  assert.ok(!stub.includes('✓'));
+  // The stub's rail/arrow replace the declared connectors in the stream, and
+  // stableIndent false flattens the altitude indent.
+  const declaredStream = renderCircuitObservation(scenarioEvent('first', 4), { policy: policy(), previous: true });
+  const stubStream = renderCircuitObservation(scenarioEvent('first', 4), { policy: stubPolicy(), previous: true });
+  assert.equal(declaredStream.split('\n')[0].trim(), '│');
+  assert.equal(declaredStream.split('\n')[1].trim(), '▼');
+  assert.equal(stubStream.split('\n')[0].trim(), '|');
+  assert.equal(stubStream.split('\n')[1].trim(), 'v');
+  const providerEvent = { observationType: 'cell-execution-testimony.v1',
+    cellId: 'cell:provider:example.operation.1', cellAltitude: 'provider', durationMilliseconds: 2 };
+  assert.ok(renderCircuitObservation(providerEvent, { policy: policy() }).startsWith('  ┌'));
+  assert.ok(renderCircuitObservation(providerEvent, { policy: stubPolicy() }).startsWith('┌'));
+});
+
+test('a circuit render without the declared policy fails instead of using built-in values', () => {
+  const overlay = { cells: [cell('cell:scenario:example', null, 'scenario',
+    { semanticRole: 'SCENARIO_OUTCOME', scenarioId: 'example' }, [entry(5, 1)])] };
+  assert.throws(() => render({ object: 'capability', verb: 'observe', format: 'circuit' }, { capabilityId: 'example', overlay }, mapping()),
+    error => error.code === 'PRESENTATION_POLICY_REQUIRED' && error.exitCode === 4);
+  assert.throws(() => renderCircuitObservation(scenarioEvent('first', 4), {}),
+    error => error.code === 'PRESENTATION_POLICY_REQUIRED');
+});
+
 test('a circuit observe streams boxes to stdout in arrival order and never renders the story trace', async t => {
   const configFile = await project(t);
   const arrived = [];
+  const invoked = [];
   const outcome = { payload: { capabilityId: 'example', overlay: {
     cells: [
       cell('cell:scenario:first', null, 'scenario', { semanticRole: 'SCENARIO_OUTCOME', scenarioId: 'first' }, [entry(4, 1)]),
@@ -186,6 +296,8 @@ test('a circuit observe streams boxes to stdout in arrival order and never rende
     ] }, result: { outcome: { payload: { symbol: 'AVGO' } } },
     story: { scenario: { scenarioId: 'example', outcomeId: 'result', responsibilities: [] } } } };
   const factory = () => ({ execute: async (request, { onObservation } = {}) => {
+    invoked.push(request.subject);
+    if (request.subject === 'read-circuit-presentation') return { result: { outcome: policy() } };
     for (const event of [scenarioEvent('first', 4), scenarioEvent('admitted', 5)]) {
       arrived.push(event.cellId);
       onObservation?.(event);
@@ -197,10 +309,13 @@ test('a circuit observe streams boxes to stdout in arrival order and never rende
   const argv = ['capability', 'observe', 'example', '--input', '{}', '--format', 'circuit', '--config', configFile];
   assert.equal(await runCli(argv, { stdout: stdout.stream, stderr: stderr.stream, factory }), 0);
   const text = stdout.text();
+  // The policy is fetched before execution, over the same client.
+  assert.deepEqual(invoked, ['read-circuit-presentation', 'example']);
   assert.deepEqual(arrived, ['cell:scenario:first', 'cell:scenario:admitted']);
   assert.ok(text.startsWith('CIRCUIT  example\n'));
-  assert.ok(text.indexOf('SCENARIO  first  ✓  4 ms') > 0);
-  assert.ok(text.indexOf('SCENARIO  admitted  ✓  5 ms') > text.indexOf('SCENARIO  first'));
+  assert.ok(text.includes('SCENARIO  first'));
+  assert.ok(text.includes('✓ 4 ms'));
+  assert.ok(text.indexOf('SCENARIO  first') < text.indexOf('SCENARIO  admitted'));
   assert.ok(text.includes('BRANCH  first'));
   assert.ok(text.includes('► ADMITTED'));
   assert.ok(text.includes('× REFUSED  NO EFFECT'));
@@ -210,6 +325,30 @@ test('a circuit observe streams boxes to stdout in arrival order and never rende
   assert.ok(!text.includes('Scenario example'));
   assert.ok(!text.includes('Σ'));
   assert.equal(stderr.text(), '');
+});
+
+test('a failed policy fetch fails the circuit command with the delivery error and no fallback', async t => {
+  const configFile = await project(t);
+  const factory = () => ({ execute: async request => {
+    if (request.subject === 'read-circuit-presentation')
+      throw new SidefxError('DELIVERY_FAILED', 'Estate delivery exited 1.', 4);
+    return { payload: { capabilityId: 'example' } };
+  } });
+  const stdout = carrier();
+  const stderr = carrier();
+  const argv = ['capability', 'observe', 'example', '--input', '{}', '--format', 'circuit', '--config', configFile];
+  assert.equal(await runCli(argv, { stdout: stdout.stream, stderr: stderr.stream, factory }), 4);
+  assert.equal(stdout.text(), '');
+  assert.ok(stderr.text().includes('DELIVERY_FAILED: Estate delivery exited 1.'));
+
+  const malformed = () => ({ execute: async request => request.subject === 'read-circuit-presentation'
+    ? { result: { outcome: { policyType: 'something-else' } } }
+    : { payload: { capabilityId: 'example' } } });
+  const secondOut = carrier();
+  const secondErr = carrier();
+  assert.equal(await runCli(argv, { stdout: secondOut.stream, stderr: secondErr.stream, factory: malformed }), 4);
+  assert.equal(secondOut.text(), '');
+  assert.ok(secondErr.text().includes('PRESENTATION_POLICY_REJECTED'));
 });
 
 test('--format circuit leaves --json byte-identical', async t => {

@@ -173,7 +173,19 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     // (the planned selection branches and the outcome payload).
     const circuit = !json && observed && request.format === 'circuit';
     const circuitState = circuit ? {} : null;
-    if (circuit) stdout.write(`CIRCUIT  ${request.subject}\n`);
+    if (circuit) {
+      // The presentation policy is declared authority, fetched before execution
+      // over the same sidefx client. Geometry, glyphs, connectors and layout are
+      // interpreted from it, never built into the terminal. A failed fetch fails
+      // the command with the delivery error; there is no fallback policy.
+      const read = await sidefx.execute({ object: 'capability', verb: 'invoke',
+        subject: 'read-circuit-presentation', input: { contractId: 'circuit-presentation-request.v1' } });
+      const policy = read?.result?.outcome;
+      requireValue(policy?.policyType === 'circuit-presentation.v1', 'PRESENTATION_POLICY_REJECTED',
+        'The declared circuit presentation policy was not delivered.', 4);
+      circuitState.policy = policy;
+      stdout.write(`CIRCUIT  ${request.subject}\n`);
+    }
     // The story stream's clock is read from the event times the estate already
     // reports: each human entry prints the elapsed wall time since the previous
     // streamed entry, and the completed stream prints its total span. --json
@@ -200,7 +212,7 @@ export async function runCli(argv, { stdout = process.stdout, stderr = process.s
     // `--trace` is a presentation reading, not an estate field: it selects the
     // hierarchical trace after the story and never leaves the terminal.
     stdout.write(json ? `${JSON.stringify(result, null, 2)}\n`
-      : `${render({ ...request, trace: values.trace, streamedCircuit: circuit }, result, mapping)}\n`);
+      : `${render({ ...request, trace: values.trace, streamedCircuit: circuit, presentation: circuitState?.policy }, result, mapping)}\n`);
     return 0;
   } catch (error) {
     if (error.code === 'EPIPE') return 0;
