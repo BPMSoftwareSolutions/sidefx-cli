@@ -602,7 +602,103 @@ function circuitBranch(group, context, columns, sourceWidth, rail) {
   };
 }
 
+// The closing frame: only what testimony alone cannot know. Every observed
+// component already streamed as a box; what remains is the planned selection
+// topology — both branches, the admitted one lit, the unobserved one marked NO
+// EFFECT — and the outcome payload.
+function circuitTextBranch(variants, sourceCenter) {
+  const gap = 6;
+  const widths = variants.map(variant => Math.max(variant.marker.length, variant.target.length));
+  const offsets = [];
+  let cursor = 0;
+  for (const width of widths) { offsets.push(cursor); cursor += width + gap; }
+  const centers = widths.map((width, index) => offsets[index] + Math.floor(width / 2));
+  const left = Math.min(sourceCenter, centers[0]);
+  const right = Math.max(sourceCenter, centers[centers.length - 1]);
+  const fan = Array.from({ length: right + 1 }, () => ' ');
+  for (let column = left + 1; column < right; column += 1) fan[column] = CIRCUIT.horizontal;
+  fan[left] = CIRCUIT.topLeft;
+  fan[right] = CIRCUIT.topRight;
+  for (const center of centers) if (center > left && center < right) fan[center] = CIRCUIT.teeDown;
+  for (const center of centers) if (center === left || center === right) fan[center] = CIRCUIT.teeDown;
+  if (sourceCenter > left && sourceCenter < right) fan[sourceCenter] = CIRCUIT.teeUp;
+  else if (sourceCenter === left && fan[left] === CIRCUIT.topLeft) fan[left] = CIRCUIT.bottomLeft;
+  else if (sourceCenter === right && fan[right] === CIRCUIT.topRight) fan[right] = CIRCUIT.bottomRight;
+  const markerRow = Array.from({ length: right + 1 }, () => ' ');
+  const targetRow = Array.from({ length: right + 1 }, () => ' ');
+  variants.forEach((variant, index) => {
+    const start = Math.max(0, centers[index] - Math.floor(variant.marker.length / 2));
+    for (let position = 0; position < variant.marker.length; position += 1) markerRow[start + position] = variant.marker[position];
+    const targetStart = Math.max(0, centers[index] - Math.floor(variant.target.length / 2));
+    for (let position = 0; position < variant.target.length; position += 1) targetRow[targetStart + position] = variant.target[position];
+  });
+  return [fan.join('').replace(/\s+$/, ''), circuitRow(centers, CIRCUIT.vertical, right + 1),
+    markerRow.join('').replace(/\s+$/, ''), targetRow.join('').replace(/\s+$/, '')];
+}
+
+function circuitClosing(overlay, payload) {
+  const cells = (overlay?.cells ?? []).filter(isCircuitCell);
+  const cellsById = new Map(cells.map(cell => [cell.cellId, cell]));
+  const routes = circuitRoutes(overlay?.edges ?? [], cellsById);
+  const lines = [];
+  for (const [sourceId, group] of routes) {
+    const title = `BRANCH  ${circuitLabel(cellsById.get(sourceId))}`;
+    const variants = group.map(variant => ({
+      marker: variant.admitted
+        ? `${CIRCUIT.right} ${variant.variant}`
+        : `${CIRCUIT.noEffect} ${variant.variant}  NO EFFECT`,
+      target: circuitLabel(variant.target)
+    }));
+    lines.push(title, ...circuitTextBranch(variants, 8 + Math.floor((title.length - 8) / 2)));
+  }
+  const evidence = payload?.result?.outcome?.payload;
+  if (evidence !== undefined) lines.push('', `EVIDENCE  ${JSON.stringify(evidence)}`);
+  return lines.join('\n');
+}
+
+// A streamed semantic component from one observation event. Expression and
+// selection sub-cells belong to their enclosing cell and never print. The
+// status is the testimony's own token in the order it settles: the declared
+// outcome classification, the declared display entry, then the mechanical
+// disposition; an event carrying none stays unobserved, never failed. The
+// duration is the event's own field, verbatim.
+const circuitStreamStatus = event => {
+  if (event?.outcomeClassification === 'success') return 'completed';
+  if (event?.outcomeClassification === 'failure') return 'failed';
+  const declared = event?.display?.entry?.status;
+  if (typeof declared === 'string' && declared.length) return declared;
+  return typeof event?.disposition === 'string' ? event.disposition : undefined;
+};
+
+const circuitStreamCell = event => {
+  if (typeof event?.cellId !== 'string' || !['scenario', 'mechanic', 'provider', 'physical'].includes(event.cellAltitude)
+    || event.cellId.includes(':expression') || event.cellId.includes(':selection')) return null;
+  const status = circuitStreamStatus(event);
+  return { cellId: event.cellId, altitude: event.cellAltitude, semanticAddress: event,
+    observed: status === undefined ? [] : [{ disposition: status, durationMilliseconds: event.durationMilliseconds }] };
+};
+
+// The streamed circuit: one box per semantic component as testimony arrives,
+// with the connector centered under the arriving box. The stream's order is the
+// execution's own; the closing frame carries the plan-only knowledge. The
+// per-invocation state belongs to the caller, because the box prints as the
+// event arrives rather than being collected into a view.
+export function renderCircuitObservation(event, state = {}) {
+  const cell = circuitStreamCell(event);
+  if (cell === null) return '';
+  const content = circuitContent(cell, { detailed: true });
+  const width = circuitWidth(content);
+  const depth = cell.altitude === 'provider' || cell.altitude === 'physical' ? 2 : 0;
+  const center = depth + Math.floor(width / 2);
+  const lines = [];
+  if (state.previous) lines.push(`${' '.repeat(center)}${CIRCUIT.vertical}`, `${' '.repeat(center)}${CIRCUIT.down}`);
+  lines.push(...shiftLines(circuitBox(content, width), depth));
+  state.previous = true;
+  return lines.join('\n');
+}
+
 export function circuitView(overlay, payload, request) {
+  if (request?.streamedCircuit === true) return circuitClosing(overlay, payload);
   const cells = (overlay?.cells ?? []).filter(isCircuitCell);
   if (!cells.length) return pretty(payload ?? overlay ?? {});
   const counts = circuitCounts(cells);
@@ -625,8 +721,11 @@ export function circuitView(overlay, payload, request) {
 function format(operation, payload, request) {
   const declared = payload?.display?.document;
   if (operation === 'agent-invoke') return agentLines(payload);
-  if (operation === 'observe' && request?.format === 'circuit' && payload?.overlay)
-    return circuitView(payload.overlay, payload, request);
+  // A streamed circuit always closes with its own frame, overlay or not: the
+  // stream already owns the boxes, so a closing story would be a second reading.
+  if (operation === 'observe' && request?.format === 'circuit'
+    && (payload?.overlay || request?.streamedCircuit === true))
+    return circuitView(payload?.overlay, payload, request);
   if (operation === 'observe' && payload?.story) {
     // The declared document owns the reading selection: when it is present the
     // terminal emits its bytes and never composes a second reading of its own.
