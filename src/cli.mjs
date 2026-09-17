@@ -19,10 +19,6 @@ Options:
   --as VIEW          Selectable view, where the operation declares one
   --format NAME      Presentation the operation offers (e.g. markdown)
   --display          Apply the capability's declared display projection
-  --objective TEXT   The objective an agent operation carries (alternative to
-                     --input for the agent surface)
-  --model NAME       The model an agent operation is allowed to see, where the
-                     operation declares one (this environment admits gemini)
   --scenario ID      Select a scenario
   --namespace NAME   Namespace filter, where the operation declares one
   --workspace PATH   Projection workspace: the declared documents are staged
@@ -82,7 +78,6 @@ function parseOptions(argv) {
       'input-type': { type: 'string' },
       as: { type: 'string' }, scenario: { type: 'string' }, namespace: { type: 'string' },
       format: { type: 'string' },
-      objective: { type: 'string' }, model: { type: 'string' },
       display: { type: 'boolean' },
       workspace: { type: 'string' }, targets: { type: 'string' }, 'full-mechanics': { type: 'boolean' },
       'codegen-pattern': { type: 'string', multiple: true },
@@ -100,7 +95,6 @@ export function parseCommand(argv, mapping) {
   if (values.timeout !== undefined) requireValue(/^\d+$/.test(values.timeout) && Number(values.timeout) > 0
     && Number(values.timeout) <= 2_147_483_647, 'INVALID_TIMEOUT', '--timeout must be a positive integer below 2147483648.', 2);
   const request = { ...parseSemanticCommand(positionals, mapping), as: values.as, format: values.format, display: values.display, inputType: values['input-type'], namespace: values.namespace, observationAltitudes: values['observation-altitude'], workspace: values.workspace, fullMechanics: values['full-mechanics'], codegenPatterns: values['codegen-pattern'],
-    objective: values.objective, model: values.model,
     targets: values.targets === undefined ? undefined : values.targets.split(',').filter(target => target.length > 0) };
   requireValue(values.scenario === undefined || request.scenario === undefined,
     'OPTION_NOT_APPLICABLE', 'Supply a scenario either positionally or with --scenario.', 2);
