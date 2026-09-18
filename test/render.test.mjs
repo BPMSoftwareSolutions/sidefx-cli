@@ -60,10 +60,13 @@ test('the observed story renders declared faces, ordered responsibilities and co
   assert.equal(lines[6], '  ✓ equity-market-price-evidence  (equity-market-price-evidence.v1)');
   assert.ok(text.includes('Scenario child-scenario  under resolve-equity-market-price-evidence'));
   assert.ok(text.includes('  × child-port  2 ms'));
-  // The declared display projection is appended when asked for; the story is not.
+  // The declared display reading is always appended to the observed story: the
+  // capability declares its outcome reading, and observation renders it. The
+  // `--display` flag remains the invoke-side ask and changes nothing here.
   assert.ok(text.includes('"observedPrice": 344.72'));
   const bare = render({ object: 'capability', verb: 'observe' }, { ...payload }, mapping);
-  assert.ok(!bare.includes('344.72'));
+  assert.ok(bare.includes('"observedPrice": 344.72'));
+  assert.ok(bare.includes('Scenario resolve-equity-market-price-evidence'));
 });
 
 test('reveal emits the declared reader document and selects markdown by declared format', () => {
@@ -112,8 +115,12 @@ test('--trace keeps the mechanical depth: the story first, then the observed tre
       semanticAddress: { semanticRole: 'MECHANIC', mechanicId: 'object', mechanicPath: 'payload' },
       observed: [{ disposition: 'completed', durationMilliseconds: 1, logicalOrder: 1 }] }
   ] };
-  const text = render({ object: 'capability', verb: 'observe', trace: true }, { story, overlay }, mapping);
+  const payload = { story, overlay, display: { select: 'outcome.payload', as: 'json' },
+    result: { outcome: { payload: { observedPrice: 344.72 } } } };
+  const text = render({ object: 'capability', verb: 'observe', trace: true }, payload, mapping);
   assert.ok(text.includes('TRACE'));
+  // The reading order is the declared one: story, declared reading, trace.
+  assert.ok(text.indexOf('"observedPrice": 344.72') < text.indexOf('TRACE'));
   assert.ok(text.includes('✓ scenario example  5 ms'));
   assert.ok(text.includes('  ✓ first-port  4 ms'));
   assert.ok(text.includes('    ✓ object payload  1 ms'));

@@ -121,7 +121,12 @@ function storyLines(story, payload, request) {
     lines.push('', `Scenario ${composed.scenarioId}${composed.parentScenarioId ? `  under ${composed.parentScenarioId}` : ''}`);
     for (const entry of composed.responsibilities ?? []) lines.push(responsibilityLine(entry));
   }
-  if (request?.display && payload?.display) {
+  // The observe reading always carries its declared display. A declared
+  // transformation document owns the reading when present; otherwise the
+  // declared selection is the capability's declared outcome reading and is
+  // appended to the story. `--display` is the invoke-side ask; observation is
+  // the reading operation and never withholds the reading it declares.
+  if (payload?.display && typeof payload.display.select === 'string') {
     const value = select(payload?.result, payload.display.select);
     lines.push('', payload.display.as === 'json' ? pretty(value) : safe(String(value ?? '')));
   }
